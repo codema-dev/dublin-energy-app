@@ -10,10 +10,6 @@ from pandas import DataFrame
 import plotly.express as px
 import streamlit as st
 
-data_dir = Path("./data")
-
-st.title("Dublin Housing Energy Demand App")
-
 
 @st.cache
 def load_data(data_dir: Path) -> Tuple[DataFrame, DataFrame, GeoDataFrame]:
@@ -27,39 +23,6 @@ def load_data(data_dir: Path) -> Tuple[DataFrame, DataFrame, GeoDataFrame]:
     )
 
     return indiv_hh_raw, esri_forecast, small_area_boundaries
-
-
-data_load_state = st.text("Loading data...")
-data_dir = Path("data")
-indiv_hh_raw, esri_forecast, small_area_boundaries = load_data(data_dir)
-data_load_state.text("Loading data ... Done!")
-
-if st.checkbox("Show ESRI Projections"):
-    st.subheader("Structural Housing Demand Projections By Local Authority 2017-2014")
-    st.markdown(
-        "*Source: Bergin, A. and García-Rodríguez, A., 2020."
-        " Regional demographics and structural housing demand at a county Level."
-        " ESRI, Economic & Social Research Institute.*"
-    )
-    st.write(esri_forecast)
-
-if st.checkbox("Show Individual Housing Sample"):
-    st.write(indiv_hh_raw.sample(50))
-
-
-scenario = st.selectbox(
-    "Select a Scenario", ["50:50", "High Migration", "Low Migration"]
-)
-
-percentage_demand_met = st.slider(
-    "Percentage of Projected Housing Demand Built",
-    min_value=0,
-    max_value=100,
-    value=50,
-)
-percentage_demand_met = percentage_demand_met / 100
-
-year = st.slider("Year", min_value=2021, max_value=2040)
 
 
 @st.cache
@@ -81,9 +44,6 @@ def project_la_housing_demand(
         .round()
         .loc[2021:]
     )
-
-
-projected_la_housing_demand = project_la_housing_demand(esri_forecast)
 
 
 @st.cache
@@ -105,64 +65,6 @@ def add_new_housing(
             .assign(period_built="2021 or later")
         )
         all_new_housing.append(new_housing)
-
-
-def calculate_small_area_demands(hh_small_areas, hh_demands):
-    kwh_to_mwh_conversion_factor = 10 ** -3
-    return (
-        pd.concat([hh_small_areas, hh_demands], axis="columns")
-        .groupby("SMALL_AREA")
-        .sum()
-        .multiply(kwh_to_mwh_conversion_factor)
-        .round()
-        .rename(columns={0: "demand_mwh_per_year"})
-        .reset_index()
-    )
-
-
-def create_small_area_map(small_area_values, small_area_boundaries):
-    return (
-        small_area_values.merge(small_area_boundaries)
-        .pipe(gpd.GeoDataFrame)
-        .to_crs(epsg=4326)
-    )
-
-
-def extract_category(
-    category: str,
-    indiv_hh: pd.DataFrame,
-    query: str,
-) -> pd.DataFrame:
-    if category:
-        indiv_hh_extract = indiv_hh_raw.query(query)
-    else:
-        indiv_hh_extract = indiv_hh
-    return indiv_hh_extract
-
-
-@st.cache
-def project_la_housing_demand(
-    esri_forecast: DataFrame, scenario: str = "50:50"
-) -> DataFrame:
-
-    scenarios_keys = {"High": "2040_high", "Low": "2040_low", "50:50": "2040_50_50"}
-    return (
-        esri_forecast.set_index("COUNTYNAME")
-        .T.drop(["2017", "2026", "2031", "2040"])
-        .loc[["2021", scenarios_keys[scenario]]]
-        .rename({scenarios_keys[scenario]: "2040"})
-        .reset_index()
-        .assign(index=lambda df: df["index"].astype(int))
-        .set_index("index")
-        .reindex(range(2017, 2041, 1))
-        .interpolate()
-        .round()
-        .loc[2021:]
-        .cumsum()
-    )
-
-
-projected_la_housing_demand = project_la_housing_demand(esri_forecast)
 
 
 @st.cache
@@ -201,6 +103,18 @@ def add_new_housing(
     )
 
 
+def extract_category(
+    category: str,
+    indiv_hh: pd.DataFrame,
+    query: str,
+) -> pd.DataFrame:
+    if category:
+        indiv_hh_extract = indiv_hh_raw.query(query)
+    else:
+        indiv_hh_extract = indiv_hh
+    return indiv_hh_extract
+
+
 def calculate_small_area_demands(hh_small_areas, hh_demands):
     kwh_to_mwh_conversion_factor = 10 ** -3
     return (
@@ -222,19 +136,74 @@ def create_small_area_map(small_area_values, small_area_boundaries):
     )
 
 
-def extract_category(
-    category: str,
-    indiv_hh: pd.DataFrame,
-    query: str,
-) -> pd.DataFrame:
-    if category:
-        indiv_hh_extract = indiv_hh_raw.query(query)
-    else:
-        indiv_hh_extract = indiv_hh
-    return indiv_hh_extract
+@st.cache
+def plot_plotly_map(small_area_demand_map):
+    init_x = small_area_demand_map.geometry.centroid.x.mean()
+    init_y = small_area_demand_map.geometry.centroid.y.mean()
+    return px.choropleth_mapbox(
+        small_area_demand_map,
+        geojson=small_area_demand_map.geometry,
+        locations=small_area_demand_map.index,
+        hover_data=["SMALL_AREA", "EDNAME", "demand_mwh_per_year"],
+        labels={
+            "SMALL_AREA": "Small Area ID",
+            "EDNAME": "Electoral District",
+            "demand_mwh_per_year": "Demand [MWh/year]",
+        },
+        color="demand_mwh_per_year",
+        center={"lat": init_y, "lon": init_x},
+        mapbox_style="open-street-map",
+        height=900,
+        width=800,
+        opacity=0.5,
+        color_continuous_scale="bluered",
+        zoom=9,
+    )
 
 
-indiv_hh_latest = add_new_housing(
+data_dir = Path("./data")
+
+st.title("Dublin Housing Energy Demand App")
+indiv_hh_raw, esri_forecast, small_area_boundaries = load_data(data_dir)
+
+if st.checkbox("Show Housing Demand Projections"):
+    st.subheader("Structural Housing Demand Projections By Local Authority 2017-2014")
+    st.markdown(
+        "These housing demand projections are used to estimate the housing demand in"
+        " Dublin at any given year."
+    )
+    st.markdown(
+        "*__Source__: Bergin, A. and García-Rodríguez, A., 2020."
+        " Regional demographics and structural housing demand at a county Level."
+        " ESRI, Economic & Social Research Institute.*"
+    )
+    st.write(esri_forecast)
+
+if st.checkbox("Show Individual Housing Sample"):
+    st.markdown(
+        "This is a sample of the individual households used in the demand calculation"
+    )
+    st.write(indiv_hh_raw.sample(50))
+
+scenario = st.sidebar.selectbox(
+    "Select a Scenario", ["50:50", "High Migration", "Low Migration"]
+)
+
+percentage_demand_met = (
+    st.sidebar.slider(
+        "Percentage of Projected Housing Demand Built",
+        min_value=0,
+        max_value=100,
+        value=50,
+    )
+    / 100
+)
+
+year = st.slider("Year", min_value=2021, max_value=2040)
+
+projected_la_housing_demand = project_la_housing_demand(esri_forecast)
+
+indiv_hh_at_year = add_new_housing(
     indiv_hh_raw,
     percentage_demand_met=percentage_demand_met,
     projected_la_housing_demand=projected_la_housing_demand,
@@ -242,18 +211,18 @@ indiv_hh_latest = add_new_housing(
     random_state=42,
 )
 
-local_authorities = [None] + list(indiv_hh_latest["local_authority"].unique())
+local_authorities = [None] + list(indiv_hh_at_year["local_authority"].unique())
 local_authority = st.sidebar.selectbox("Select Local Authority", local_authorities)
 indiv_hh_in_la = extract_category(
-    local_authority, indiv_hh_latest, "local_authority == @local_authority"
+    local_authority, indiv_hh_at_year, "local_authority == @local_authority"
 )
 
-electoral_districts = [None] + list(indiv_hh_latest["EDNAME"].unique())
+electoral_districts = [None] + list(indiv_hh_at_year["EDNAME"].unique())
 electoral_district = st.sidebar.selectbox(
     "Select Electoral District", electoral_districts
 )
 indiv_hh_in_ed = extract_category(
-    electoral_district, indiv_hh_latest, "EDNAME == @electoral_district"
+    electoral_district, indiv_hh_at_year, "EDNAME == @electoral_district"
 )
 
 indiv_hh_extract = indiv_hh_in_ed if electoral_district else indiv_hh_in_la
@@ -263,67 +232,12 @@ hh_demands = indiv_hh["inferred_floor_area"] * indiv_hh["energy_kwh_per_m2_year"
 small_area_demands = calculate_small_area_demands(indiv_hh["SMALL_AREA"], hh_demands)
 small_area_demand_map = create_small_area_map(small_area_demands, small_area_boundaries)
 
+kwh_to_gwh_conversion_factor = 10 ** -9
+total_demand = round(hh_demands.sum() * kwh_to_gwh_conversion_factor, 2)
 
-@st.cache
-def plot_plotly_map(small_area_demand_map):
-    init_x = small_area_demand_map.geometry.centroid.x.mean()
-    init_y = small_area_demand_map.geometry.centroid.y.mean()
-    return px.choropleth_mapbox(
-        small_area_demand_map,
-        geojson=small_area_demand_map.geometry,
-        locations=small_area_demand_map.index,
-        hover_data=["SMALL_AREA", "demand_mwh_per_year"],
-        labels={
-            "SMALL_AREA": "Small Area ID",
-            "demand_mwh_per_year": "Demand [MWh/year]",
-        },
-        color="demand_mwh_per_year",
-        center={"lat": init_y, "lon": init_x},
-        mapbox_style="open-street-map",
-        height=900,
-        width=800,
-        opacity=0.75,
-        zoom=9,
-    )
+left_column, right_column = st.beta_columns(2)
+left_column.write("Estimated Total Demand [GWh/year]")
+right_column.write(total_demand)
 
-
-total_demand = hh_demands.sum() / 10 ** 6
-st.write("Total Demand [GWh/year]:")
-st.write(total_demand)
-
-indiv_hh_extract = indiv_hh_in_ed if electoral_district else indiv_hh_in_la
-
-indiv_hh = indiv_hh_extract
-hh_demands = indiv_hh["inferred_floor_area"] * indiv_hh["energy_kwh_per_m2_year"]
-small_area_demands = calculate_small_area_demands(indiv_hh["SMALL_AREA"], hh_demands)
-total_demand = hh_demands.sum()
-small_area_demand_map = create_small_area_map(small_area_demands, small_area_boundaries)
-
-
-@st.cache
-def plot_plotly_map(small_area_demand_map):
-    init_x = small_area_demand_map.geometry.centroid.x.mean()
-    init_y = small_area_demand_map.geometry.centroid.y.mean()
-    return px.choropleth_mapbox(
-        small_area_demand_map,
-        geojson=small_area_demand_map.geometry,
-        locations=small_area_demand_map.index,
-        hover_data=["SMALL_AREA", "demand_mwh_per_year"],
-        labels={
-            "SMALL_AREA": "Small Area ID",
-            "demand_mwh_per_year": "Demand [MWh/year]",
-        },
-        color="demand_mwh_per_year",
-        center={"lat": init_y, "lon": init_x},
-        mapbox_style="open-street-map",
-        height=900,
-        width=800,
-        opacity=0.75,
-        zoom=9,
-    )
-
-
-map_load_state = st.text("Creating map...")
 fig = plot_plotly_map(small_area_demand_map)
 st.plotly_chart(fig)
-map_load_state.text("Creating map... Done!")
