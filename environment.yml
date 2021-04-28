@@ -6,3 +6,4 @@ dependencies:
   - geopandas
   - plotly
   - streamlit
+  - pandas-stubs
