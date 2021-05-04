@@ -43,6 +43,7 @@ def project_la_housing_demand(
         .interpolate()
         .round()
         .loc[2021:]
+        .cumsum()
     )
 
 
@@ -137,7 +138,7 @@ def create_small_area_map(small_area_values, small_area_boundaries):
 
 
 @st.cache
-def plot_plotly_map(small_area_demand_map):
+def plot_plotly_map(small_area_demand_map: GeoDataFrame, zoom: float):
     init_x = small_area_demand_map.geometry.centroid.x.mean()
     init_y = small_area_demand_map.geometry.centroid.y.mean()
     return px.choropleth_mapbox(
@@ -157,7 +158,7 @@ def plot_plotly_map(small_area_demand_map):
         width=800,
         opacity=0.5,
         color_continuous_scale="bluered",
-        zoom=9,
+        zoom=zoom,
     )
 
 
@@ -225,19 +226,29 @@ indiv_hh_in_ed = extract_category(
     electoral_district, indiv_hh_at_year, "EDNAME == @electoral_district"
 )
 
+electoral_district = None if local_authority is not None else electoral_district
+local_authority = None if electoral_district is not None else local_authority
+
 indiv_hh_extract = indiv_hh_in_ed if electoral_district else indiv_hh_in_la
+
 
 indiv_hh = indiv_hh_extract
 hh_demands = indiv_hh["inferred_floor_area"] * indiv_hh["energy_kwh_per_m2_year"]
 small_area_demands = calculate_small_area_demands(indiv_hh["SMALL_AREA"], hh_demands)
 small_area_demand_map = create_small_area_map(small_area_demands, small_area_boundaries)
 
-kwh_to_gwh_conversion_factor = 10 ** -9
-total_demand = round(hh_demands.sum() * kwh_to_gwh_conversion_factor, 2)
+kwh_to_mwh_conversion_factor = 10 ** -6
+total_demand = round(hh_demands.sum() * kwh_to_mwh_conversion_factor, 2)
 
 left_column, right_column = st.beta_columns(2)
-left_column.write("Estimated Total Demand [GWh/year]")
+left_column.write("Estimated Total Demand [MWh/year]")
 right_column.write(total_demand)
 
-fig = plot_plotly_map(small_area_demand_map)
+if local_authority:
+    zoom = 9.5
+elif electoral_district:
+    zoom = 13
+else:
+    zoom = 9
+fig = plot_plotly_map(small_area_demand_map, zoom=zoom)
 st.plotly_chart(fig)
