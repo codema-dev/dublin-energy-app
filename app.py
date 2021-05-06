@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+from typing import Dict
 from typing import List
 from typing import Tuple
 
@@ -10,19 +12,25 @@ from pandas import DataFrame
 import plotly.express as px
 import streamlit as st
 
+from deap import calculate_heat_loss_parameter
+
+KWH_TO_MWH = 10 ** -3
+
 
 @st.cache
 def load_data(data_dir: Path) -> Tuple[DataFrame, DataFrame, GeoDataFrame]:
 
-    indiv_hh_raw: DataFrame = pd.read_csv(data_dir / "streamlit_dublin_indiv_hh.csv")
+    indiv_hh_raw: DataFrame = pd.read_parquet(data_dir / "dublin_indiv_hh.parquet")
+    with open(data_dir / "archetype_new_build.json", "r") as file:
+        archetype_new_build = pd.Series(json.load(file))
     esri_forecast: DataFrame = pd.read_csv(
         data_dir / "esri_housing_forecast_12_2020.csv"
     )
     small_area_boundaries: GeoDataFrame = gpd.read_file(
         data_dir / "dublin_small_area_boundaries_2011.geojson", driver="GeoJSON"
-    )
+    ).to_crs(epsg=4326)
 
-    return indiv_hh_raw, esri_forecast, small_area_boundaries
+    return indiv_hh_raw, archetype_new_build, esri_forecast, small_area_boundaries
 
 
 @st.cache
@@ -47,30 +55,21 @@ def project_la_housing_demand(
     )
 
 
-@st.cache
+def extract_category(
+    category: str,
+    indiv_hh: pd.DataFrame,
+    query: str,
+) -> pd.DataFrame:
+    if category:
+        indiv_hh_extract = indiv_hh_raw.query(query)
+    else:
+        indiv_hh_extract = indiv_hh
+    return indiv_hh_extract
+
+
 def add_new_housing(
     indiv_hh: DataFrame,
-    percentage_demand_met: float,
-    projected_la_housing_demand: DataFrame,
-    year: int,
-    random_state: int = 42,
-) -> DataFrame:
-
-    annual_demand = projected_la_housing_demand.loc[year]
-    all_new_housing: List[DataFrame] = []
-    for la, demand in annual_demand.items():
-        new_housing = (
-            indiv_hh.query("local_authority == @la")
-            .sample(int(demand), random_state=random_state)
-            .loc[:, ["local_authority", "SMALL_AREA", "EDNAME"]]
-            .assign(period_built="2021 or later")
-        )
-        all_new_housing.append(new_housing)
-
-
-@st.cache
-def add_new_housing(
-    indiv_hh: DataFrame,
+    archetype_new_build: pd.Series,
     percentage_demand_met: float,
     projected_la_housing_demand: DataFrame,
     year: int,
@@ -85,79 +84,39 @@ def add_new_housing(
             indiv_hh.query("local_authority == @la")
             .sample(la_total_new_buildings, random_state=random_state)
             .loc[:, ["local_authority", "SMALL_AREA", "EDNAME"]]
-            .assign(period_built="2021 or later")
+            .assign(regulatory_period="2011 or later")
         )
         new_housing_by_la.append(la_new_housing)
 
-    new_housing = pd.concat(new_housing_by_la).assign(
-        inferred_ber="A", energy_kwh_per_m2_year=25
+    new_housing = pd.concat(new_housing_by_la).merge(
+        archetype_new_build.to_frame().T,
+        on="regulatory_period",
     )
 
-    return (
-        pd.concat([indiv_hh, new_housing])
-        .reset_index(drop=True)
-        .assign(
-            inferred_floor_area=lambda df: df.groupby("SMALL_AREA")[
-                "inferred_floor_area"
-            ].apply(lambda x: x.fillna(x.median()))
-        )
-    )
+    return pd.concat([indiv_hh, new_housing]).reset_index(drop=True)
 
 
-def extract_category(
-    category: str,
-    indiv_hh: pd.DataFrame,
-    query: str,
-) -> pd.DataFrame:
-    if category:
-        indiv_hh_extract = indiv_hh_raw.query(query)
-    else:
-        indiv_hh_extract = indiv_hh
-    return indiv_hh_extract
-
-
-def calculate_small_area_demands(hh_small_areas, hh_demands):
-    kwh_to_mwh_conversion_factor = 10 ** -3
-    return (
-        pd.concat([hh_small_areas, hh_demands], axis="columns")
-        .groupby("SMALL_AREA")
-        .sum()
-        .multiply(kwh_to_mwh_conversion_factor)
-        .round()
-        .rename(columns={0: "demand_mwh_per_year"})
-        .reset_index()
-    )
-
-
-def create_small_area_map(small_area_values, small_area_boundaries):
-    return (
-        small_area_values.merge(small_area_boundaries)
-        .pipe(gpd.GeoDataFrame)
-        .to_crs(epsg=4326)
-    )
-
-
-@st.cache
-def plot_plotly_map(small_area_demand_map: GeoDataFrame, zoom: float):
-    init_x = small_area_demand_map.geometry.centroid.x.mean()
-    init_y = small_area_demand_map.geometry.centroid.y.mean()
+def plot_plotly_choropleth_mapbox_map(
+    small_areas: GeoDataFrame,
+    zoom: float,
+    labels: Dict[str, str],
+    hover_data: List[str],
+    color: str,
+):
+    init_x = small_areas.geometry.centroid.x.mean()
+    init_y = small_areas.geometry.centroid.y.mean()
     return px.choropleth_mapbox(
-        small_area_demand_map,
-        geojson=small_area_demand_map.geometry,
-        locations=small_area_demand_map.index,
-        hover_data=["SMALL_AREA", "EDNAME", "demand_mwh_per_year"],
-        labels={
-            "SMALL_AREA": "Small Area ID",
-            "EDNAME": "Electoral District",
-            "demand_mwh_per_year": "Demand [MWh/year]",
-        },
-        color="demand_mwh_per_year",
+        small_areas,
+        geojson=small_areas.geometry,
+        locations=small_areas.index,
+        hover_data=hover_data,
+        labels=labels,
+        color=color,
         center={"lat": init_y, "lon": init_x},
         mapbox_style="open-street-map",
         height=900,
         width=800,
-        opacity=0.5,
-        color_continuous_scale="bluered",
+        opacity=0.75,
         zoom=zoom,
     )
 
@@ -165,7 +124,9 @@ def plot_plotly_map(small_area_demand_map: GeoDataFrame, zoom: float):
 data_dir = Path("./data")
 
 st.title("Dublin Housing Energy Demand App")
-indiv_hh_raw, esri_forecast, small_area_boundaries = load_data(data_dir)
+indiv_hh_raw, archetype_new_build, esri_forecast, small_area_boundaries = load_data(
+    data_dir
+)
 
 if st.checkbox("Show Housing Demand Projections"):
     st.subheader("Structural Housing Demand Projections By Local Authority 2017-2014")
@@ -200,12 +161,14 @@ percentage_demand_met = (
     / 100
 )
 
+
 year = st.slider("Year", min_value=2021, max_value=2040)
 
 projected_la_housing_demand = project_la_housing_demand(esri_forecast)
 
 indiv_hh_at_year = add_new_housing(
     indiv_hh_raw,
+    archetype_new_build,
     percentage_demand_met=percentage_demand_met,
     projected_la_housing_demand=projected_la_housing_demand,
     year=year,
@@ -231,18 +194,72 @@ local_authority = None if electoral_district is not None else local_authority
 
 indiv_hh_extract = indiv_hh_in_ed if electoral_district else indiv_hh_in_la
 
-
 indiv_hh = indiv_hh_extract
-hh_demands = indiv_hh["inferred_floor_area"] * indiv_hh["energy_kwh_per_m2_year"]
-small_area_demands = calculate_small_area_demands(indiv_hh["SMALL_AREA"], hh_demands)
-small_area_demand_map = create_small_area_map(small_area_demands, small_area_boundaries)
+small_areas = small_area_boundaries.to_crs(epsg=4326).set_index("SMALL_AREA")
 
-kwh_to_mwh_conversion_factor = 10 ** -6
-total_demand = round(hh_demands.sum() * kwh_to_mwh_conversion_factor, 2)
+typical_boiler_efficiency = 0.85
+indiv_hh["heat_mwh_per_year"] = (
+    indiv_hh["total_floor_area"]
+    * indiv_hh["Energy Value"]
+    * typical_boiler_efficiency
+    * KWH_TO_MWH
+)
+heat_mwh_per_year = (
+    indiv_hh.groupby("SMALL_AREA")["heat_mwh_per_year"].sum().round().reset_index()
+)
+total_heat_mwh_per_year = round(indiv_hh["heat_mwh_per_year"].sum(), 2)
+
+
+# 90% of GroundFloorHeight within (2.25, 2.75) in BER Public
+assumed_floor_height = 2.5
+thermal_bridging_factor = 0.15  # 87% of ThermalBridgingFactor in BER Public
+heat_loss_parameter_cutoff = 2.3  # SEAI, Tech Advisor Role Heat Pumps 2020
+indiv_hh = indiv_hh.assign(
+    heat_loss_parameter=lambda df: calculate_heat_loss_parameter(
+        roof_area=df["Roof Total Area"],
+        roof_uvalue=df["Roof Weighted Uvalue"],
+        wall_area=df["Wall Total Area"],
+        wall_uvalue=df["Wall weighted Uvalue"],
+        floor_area=df["Floor Total Area"],
+        floor_uvalue=df["Floor Weighted Uvalue"],
+        window_area=df["Windows Total Area"],
+        window_uvalue=df["WindowsWeighted Uvalue"],
+        door_area=df["Door Total Area"],
+        door_uvalue=df["Door Weighted Uvalue"],
+        total_floor_area=df["total_floor_area"],
+        thermal_bridging_factor=thermal_bridging_factor,
+        effective_air_rate_change=df["effective_air_rate_change"],
+        no_of_storeys=df["No Of Storeys"],
+        assumed_floor_height=assumed_floor_height,
+    ),
+    heat_pump_ready=lambda df: pd.cut(
+        df["heat_loss_parameter"],
+        bins=[0, heat_loss_parameter_cutoff, np.inf],
+        labels=[True, False],
+    ).astype("bool"),
+)
+percentage_heat_pump_ready = (
+    indiv_hh.groupby("SMALL_AREA")["heat_pump_ready"]
+    .apply(lambda x: 100 * round(x.sum() / len(x), 2))
+    .rename("percentage_heat_pump_ready")
+    .reset_index()
+)
+total_heat_pump_ready = indiv_hh["heat_pump_ready"].sum()
+overall_percentage_heat_pump_ready = 100 * round(
+    indiv_hh["heat_pump_ready"].sum() / len(indiv_hh), 2
+)
+
+small_area_map = small_area_boundaries.merge(heat_mwh_per_year).merge(
+    percentage_heat_pump_ready
+)
 
 left_column, right_column = st.beta_columns(2)
-left_column.write("Estimated Total Demand [MWh/year]")
-right_column.write(total_demand)
+left_column.write("Heat Demand [MWh/year]")
+right_column.write(total_heat_mwh_per_year)
+left_column.write("Number of Heat Pump Ready Homes")
+right_column.write(total_heat_pump_ready)
+left_column.write("Overall % Heat Pump Ready")
+right_column.write(overall_percentage_heat_pump_ready)
 
 if local_authority:
     zoom = 9.5
@@ -250,5 +267,32 @@ elif electoral_district:
     zoom = 13
 else:
     zoom = 9
-fig = plot_plotly_map(small_area_demand_map, zoom=zoom)
+
+color_selected = st.selectbox(
+    label="Select Map Layer",
+    options=["% Heat Pump Ready", "Heat Demand"],
+    index=0,
+)
+if color_selected == "Heat Demand":
+    map_color = "heat_mwh_per_year"
+else:
+    map_color = "percentage_heat_pump_ready"
+
+fig = plot_plotly_choropleth_mapbox_map(
+    small_area_map,
+    zoom=zoom,
+    labels={
+        "SMALL_AREA": "Small Area ID",
+        "EDNAME": "Electoral District",
+        "heat_mwh_per_year": "Heat Demand [MWh/year]",
+        "percentage_heat_pump_ready": "% Heat Pump Ready",
+    },
+    hover_data=[
+        "SMALL_AREA",
+        "EDNAME",
+        "heat_mwh_per_year",
+        "percentage_heat_pump_ready",
+    ],
+    color=map_color,
+)
 st.plotly_chart(fig)
