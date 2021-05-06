@@ -33,7 +33,6 @@ def load_data(data_dir: Path) -> Tuple[DataFrame, DataFrame, GeoDataFrame]:
     return indiv_hh_raw, archetype_new_build, esri_forecast, small_area_boundaries
 
 
-@st.cache
 def project_la_housing_demand(
     esri_forecast: DataFrame, scenario: str = "50:50"
 ) -> DataFrame:
@@ -55,15 +54,48 @@ def project_la_housing_demand(
     )
 
 
-def extract_category(
-    category: str,
+def select_zone(indiv_hh: pd.DataFrame):
+    local_authorities = [None] + list(indiv_hh["local_authority"].unique())
+    local_authority = st.sidebar.selectbox("Select Local Authority", local_authorities)
+
+    electoral_districts = [None] + list(indiv_hh["EDNAME"].unique())
+    electoral_district = st.sidebar.selectbox(
+        "Select Electoral District", electoral_districts
+    )
+
+    if (local_authority is not None) & (electoral_district is not None):
+        zone = electoral_district
+        zone_category = "electoral_district"
+        local_authority = None
+    elif local_authority:
+        zone = local_authority
+        zone_category = "local_authority"
+    elif electoral_district:
+        zone = electoral_district
+        zone_category = "electoral_district"
+    else:
+        zone = None
+        zone_category = None
+
+    return zone, zone_category
+
+
+def extract_zone(
     indiv_hh: pd.DataFrame,
-    query: str,
+    zone: str,
+    zone_type: str,
 ) -> pd.DataFrame:
-    if category:
+
+    if zone_type == "local_authority":
+        query = "local_authority == @category"
+    elif zone_type == "electoral_district":
+        query = "EDNAME == @category"
+
+    if zone:
         indiv_hh_extract = indiv_hh_raw.query(query)
     else:
         indiv_hh_extract = indiv_hh
+
     return indiv_hh_extract
 
 
@@ -94,6 +126,82 @@ def add_new_housing(
     )
 
     return pd.concat([indiv_hh, new_housing]).reset_index(drop=True)
+
+
+def calculate_heat_demand(
+    indiv_hh: pd.DataFrame,
+) -> pd.DataFrame:
+    typical_boiler_efficiency = 0.85
+    indiv_hh_heat_mwh_per_year = (
+        indiv_hh["total_floor_area"]
+        * indiv_hh["Energy Value"]
+        * typical_boiler_efficiency
+        * KWH_TO_MWH
+    )
+    return pd.concat(
+        [
+            indiv_hh["SMALL_AREA"],
+            indiv_hh_heat_mwh_per_year.rename("heat_mwh_per_year"),
+        ],
+        axis=1,
+    )
+
+
+def calculate_heat_pump_viability(indiv_hh: pd.DataFrame) -> pd.DataFrame:
+    # 90% of GroundFloorHeight within (2.25, 2.75) in BER Public
+    assumed_floor_height = 2.5
+    thermal_bridging_factor = 0.15  # 87% of ThermalBridgingFactor in BER Public
+    heat_loss_parameter_cutoff = 2.3  # SEAI, Tech Advisor Role Heat Pumps 2020
+    heat_loss_parameter = calculate_heat_loss_parameter(
+        roof_area=indiv_hh["Roof Total Area"],
+        roof_uvalue=indiv_hh["Roof Weighted Uvalue"],
+        wall_area=indiv_hh["Wall Total Area"],
+        wall_uvalue=indiv_hh["Wall weighted Uvalue"],
+        floor_area=indiv_hh["Floor Total Area"],
+        floor_uvalue=indiv_hh["Floor Weighted Uvalue"],
+        window_area=indiv_hh["Windows Total Area"],
+        window_uvalue=indiv_hh["WindowsWeighted Uvalue"],
+        door_area=indiv_hh["Door Total Area"],
+        door_uvalue=indiv_hh["Door Weighted Uvalue"],
+        total_floor_area=indiv_hh["total_floor_area"],
+        thermal_bridging_factor=thermal_bridging_factor,
+        effective_air_rate_change=indiv_hh["effective_air_rate_change"],
+        no_of_storeys=indiv_hh["No Of Storeys"],
+        assumed_floor_height=assumed_floor_height,
+    )
+    heat_pump_ready = (
+        pd.cut(
+            heat_loss_parameter,
+            bins=[0, heat_loss_parameter_cutoff, np.inf],
+            labels=[True, False],
+        )
+        .astype("bool")
+        .rename("heat_pump_ready")
+    )
+    return pd.concat([indiv_hh["SMALL_AREA"], heat_pump_ready], axis=1)
+
+
+def set_map_zoom(zone_type: str):
+    if zone_type == "local_authority":
+        zoom = 9.5
+    elif zone_type == "electoral_district":
+        zoom = 13
+    else:
+        zoom = 9
+    return zoom
+
+
+def select_map_layer() -> str:
+    color_selected = st.selectbox(
+        label="Select Map Layer",
+        options=["% Heat Pump Ready", "Heat Demand"],
+        index=0,
+    )
+    if color_selected == "Heat Demand":
+        map_color = "heat_mwh_per_year"
+    else:
+        map_color = "percentage_heat_pump_ready"
+    return map_color
 
 
 def plot_plotly_choropleth_mapbox_map(
@@ -175,82 +283,37 @@ indiv_hh_at_year = add_new_housing(
     random_state=42,
 )
 
-local_authorities = [None] + list(indiv_hh_at_year["local_authority"].unique())
-local_authority = st.sidebar.selectbox("Select Local Authority", local_authorities)
-indiv_hh_in_la = extract_category(
-    local_authority, indiv_hh_at_year, "local_authority == @local_authority"
-)
+zone, zone_type = select_zone(indiv_hh_at_year)
+indiv_hh_in_zone = extract_zone(indiv_hh_at_year, zone, zone_type)
 
-electoral_districts = [None] + list(indiv_hh_at_year["EDNAME"].unique())
-electoral_district = st.sidebar.selectbox(
-    "Select Electoral District", electoral_districts
-)
-indiv_hh_in_ed = extract_category(
-    electoral_district, indiv_hh_at_year, "EDNAME == @electoral_district"
-)
-
-electoral_district = None if local_authority is not None else electoral_district
-local_authority = None if electoral_district is not None else local_authority
-
-indiv_hh_extract = indiv_hh_in_ed if electoral_district else indiv_hh_in_la
-
-indiv_hh = indiv_hh_extract
+indiv_hh = indiv_hh_in_zone
 small_areas = small_area_boundaries.to_crs(epsg=4326).set_index("SMALL_AREA")
 
-typical_boiler_efficiency = 0.85
-indiv_hh["heat_mwh_per_year"] = (
-    indiv_hh["total_floor_area"]
-    * indiv_hh["Energy Value"]
-    * typical_boiler_efficiency
-    * KWH_TO_MWH
+indiv_hh_heat_mwh_per_year = calculate_heat_demand(indiv_hh)
+small_area_heat_mwh_per_year = (
+    indiv_hh_heat_mwh_per_year.groupby("SMALL_AREA")["heat_mwh_per_year"]
+    .sum()
+    .round()
+    .reset_index()
 )
-heat_mwh_per_year = (
-    indiv_hh.groupby("SMALL_AREA")["heat_mwh_per_year"].sum().round().reset_index()
+total_heat_mwh_per_year = round(
+    indiv_hh_heat_mwh_per_year["heat_mwh_per_year"].sum(), 2
 )
-total_heat_mwh_per_year = round(indiv_hh["heat_mwh_per_year"].sum(), 2)
 
-
-# 90% of GroundFloorHeight within (2.25, 2.75) in BER Public
-assumed_floor_height = 2.5
-thermal_bridging_factor = 0.15  # 87% of ThermalBridgingFactor in BER Public
-heat_loss_parameter_cutoff = 2.3  # SEAI, Tech Advisor Role Heat Pumps 2020
-indiv_hh = indiv_hh.assign(
-    heat_loss_parameter=lambda df: calculate_heat_loss_parameter(
-        roof_area=df["Roof Total Area"],
-        roof_uvalue=df["Roof Weighted Uvalue"],
-        wall_area=df["Wall Total Area"],
-        wall_uvalue=df["Wall weighted Uvalue"],
-        floor_area=df["Floor Total Area"],
-        floor_uvalue=df["Floor Weighted Uvalue"],
-        window_area=df["Windows Total Area"],
-        window_uvalue=df["WindowsWeighted Uvalue"],
-        door_area=df["Door Total Area"],
-        door_uvalue=df["Door Weighted Uvalue"],
-        total_floor_area=df["total_floor_area"],
-        thermal_bridging_factor=thermal_bridging_factor,
-        effective_air_rate_change=df["effective_air_rate_change"],
-        no_of_storeys=df["No Of Storeys"],
-        assumed_floor_height=assumed_floor_height,
-    ),
-    heat_pump_ready=lambda df: pd.cut(
-        df["heat_loss_parameter"],
-        bins=[0, heat_loss_parameter_cutoff, np.inf],
-        labels=[True, False],
-    ).astype("bool"),
-)
-percentage_heat_pump_ready = (
-    indiv_hh.groupby("SMALL_AREA")["heat_pump_ready"]
+indiv_hh_heat_pump_viability = calculate_heat_pump_viability(indiv_hh)
+small_area_percentage_heat_pump_ready = (
+    indiv_hh_heat_pump_viability.groupby("SMALL_AREA")["heat_pump_ready"]
     .apply(lambda x: 100 * round(x.sum() / len(x), 2))
     .rename("percentage_heat_pump_ready")
     .reset_index()
 )
-total_heat_pump_ready = indiv_hh["heat_pump_ready"].sum()
+total_heat_pump_ready = indiv_hh_heat_pump_viability["heat_pump_ready"].sum()
 overall_percentage_heat_pump_ready = 100 * round(
-    indiv_hh["heat_pump_ready"].sum() / len(indiv_hh), 2
+    total_heat_pump_ready / len(indiv_hh), 2
 )
 
-small_area_map = small_area_boundaries.merge(heat_mwh_per_year).merge(
-    percentage_heat_pump_ready
+small_area_map = small_area_boundaries.merge(small_area_heat_mwh_per_year).merge(
+    small_area_percentage_heat_pump_ready
 )
 
 left_column, right_column = st.beta_columns(2)
@@ -261,23 +324,8 @@ right_column.write(total_heat_pump_ready)
 left_column.write("Overall % Heat Pump Ready")
 right_column.write(overall_percentage_heat_pump_ready)
 
-if local_authority:
-    zoom = 9.5
-elif electoral_district:
-    zoom = 13
-else:
-    zoom = 9
-
-color_selected = st.selectbox(
-    label="Select Map Layer",
-    options=["% Heat Pump Ready", "Heat Demand"],
-    index=0,
-)
-if color_selected == "Heat Demand":
-    map_color = "heat_mwh_per_year"
-else:
-    map_color = "percentage_heat_pump_ready"
-
+zoom = set_map_zoom(zone_type)
+map_layer = select_map_layer()
 fig = plot_plotly_choropleth_mapbox_map(
     small_area_map,
     zoom=zoom,
@@ -293,6 +341,6 @@ fig = plot_plotly_choropleth_mapbox_map(
         "heat_mwh_per_year",
         "percentage_heat_pump_ready",
     ],
-    color=map_color,
+    color=map_layer,
 )
 st.plotly_chart(fig)
