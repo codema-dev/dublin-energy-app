@@ -138,37 +138,51 @@ def simulate_new_housing(
     random_state: int = 42,
 ) -> DataFrame:
 
-    annual_demand = projected_la_housing_demand.loc[year]
-    new_housing_by_la: List[DataFrame] = []
-    for la, demand in annual_demand.items():
-        la_total_new_buildings = int(demand * percentage_demand_met)
-        la_new_housing = (
-            indiv_hh.query("local_authority == @la")
-            .sample(la_total_new_buildings, random_state=random_state)
-            .loc[:, ["local_authority", "EDNAME"]]
-        )
-        new_housing_by_la.append(la_new_housing)
+    if percentage_demand_met == 0:
+        new_housing = pd.DataFrame()
+    else:
+        annual_demand = projected_la_housing_demand.loc[year]
+        new_housing_by_la: List[DataFrame] = []
+        for la, demand in annual_demand.items():
+            la_total_new_buildings = int(demand * percentage_demand_met)
+            la_new_housing = (
+                indiv_hh.query("local_authority == @la")
+                .sample(la_total_new_buildings, random_state=random_state)
+                .loc[:, ["local_authority", "EDNAME"]]
+            )
+            new_housing_by_la.append(la_new_housing)
 
-    new_housing = pd.concat(new_housing_by_la).reset_index()
-    archetype_properties = archetype_new_build.to_frame().T
-    archetype_broadcast = pd.concat(
-        [archetype_properties] * len(new_housing)
-    ).reset_index()  # broadcast archetype to the same length as new housing
-    return pd.concat([new_housing, archetype_broadcast], axis=1).set_index("SMALL_AREA")
+        new_housing_raw = pd.concat(new_housing_by_la).reset_index()
+        archetype_properties = archetype_new_build.to_frame().T
+        archetype_broadcast = pd.concat(
+            [archetype_properties] * len(new_housing_raw)
+        ).reset_index()  # broadcast archetype to the same length as new housing
+
+        new_housing = pd.concat(
+            [new_housing_raw, archetype_broadcast], axis=1
+        ).set_index("SMALL_AREA")
+
+    return new_housing
 
 
 def select_building_subset() -> List[str]:
     st.subheader("Select Building Subset for a Retrofit Scenario")
-    c1, c2, c3, c4, c5, c6, c7 = st.beta_columns(7)
-    before_1919 = "before 1970" if c1.checkbox("before 1970") else None
-    from_71_to_80 = "1971 - 1980" if c2.checkbox("1971 to 1980") else None
-    from_81_to_80 = "1981 - 1990" if c3.checkbox("1981 to 1990") else None
-    from_91_to_00 = "1991 - 2000" if c4.checkbox("1990 to 2000") else None
-    from_01_to_05 = "2001 - 2005" if c5.checkbox("2001 to 2005") else None
-    from_06_to_10 = "2006 - 2010" if c6.checkbox("2006 to 2010") else None
-    later_than_11 = "2011 or later" if c7.checkbox("2011 or later") else None
+    c1, c2, c3, c4, c5 = st.beta_columns(5)
+    before_1919 = "before 1919" if c1.checkbox("before 1919") else None
+    from_19_to_45 = "1919 - 1945" if c2.checkbox("1919 - 1945") else None
+    from_46_to_60 = "1946 - 1960" if c3.checkbox("1946 - 1960") else None
+    from_61_to_70 = "1961 - 1970" if c4.checkbox("1961 - 1970") else None
+    from_71_to_80 = "1971 - 1980" if c5.checkbox("1971 - 1980") else None
+    from_81_to_80 = "1981 - 1990" if c1.checkbox("1981 - 1990") else None
+    from_91_to_00 = "1991 - 2000" if c2.checkbox("1990 - 2000") else None
+    from_01_to_05 = "2001 - 2005" if c3.checkbox("2001 - 2005") else None
+    from_06_to_10 = "2006 - 2010" if c4.checkbox("2006 - 2010") else None
+    later_than_11 = "2011 or later" if c5.checkbox("2011 or later") else None
     options_selected = [
         before_1919,
+        from_19_to_45,
+        from_46_to_60,
+        from_61_to_70,
         from_71_to_80,
         from_81_to_80,
         from_91_to_00,
@@ -183,31 +197,32 @@ def select_building_subset() -> List[str]:
 def improve_housing_quality(indiv_hh: pd.DataFrame, improvement: float) -> pd.DataFrame:
     indiv_hh_improved = indiv_hh.copy()
 
-    improvement = 1 - improvement
-    u_value_columns = [c for c in indiv_hh.columns if "uval" in c.lower()]
-    best_case_u_values = (
-        indiv_hh[u_value_columns].replace({0: np.nan}).min().to_frame().T.to_numpy()
-    )
-    current_u_values = indiv_hh[u_value_columns].to_numpy()
-    gap_to_target = current_u_values - best_case_u_values
-    improved_u_values = gap_to_target * improvement
+    if indiv_hh_improved.empty:
+        indiv_hh_improved = pd.DataFrame()
+    else:
+        improvement = 1 - improvement
+        u_value_columns = [c for c in indiv_hh.columns if "uval" in c.lower()]
+        best_case_u_values = (
+            indiv_hh[u_value_columns].replace({0: np.nan}).min().to_frame().T.to_numpy()
+        )
+        current_u_values = indiv_hh[u_value_columns].to_numpy()
+        gap_to_target = current_u_values - best_case_u_values
+        improved_u_values = gap_to_target * improvement
 
-    improved_u_values = pd.DataFrame(improved_u_values, columns=u_value_columns)
-    improved_u_values_all_positive = improved_u_values.where(improved_u_values >= 0, 0)
-    small_areas = pd.Series(indiv_hh.index)
-    improved_u_values_indexed = pd.concat(
-        [small_areas, improved_u_values_all_positive],
-        axis=1,
-    ).set_index("SMALL_AREA")
+        improved_u_values = pd.DataFrame(improved_u_values, columns=u_value_columns)
+        improved_u_values_all_positive = improved_u_values.where(
+            improved_u_values >= 0, 0
+        )
+        small_areas = pd.Series(indiv_hh.index)
+        improved_u_values_indexed = pd.concat(
+            [small_areas, improved_u_values_all_positive],
+            axis=1,
+        ).set_index("SMALL_AREA")
 
-    indiv_hh_improved = indiv_hh_improved.drop(columns=u_value_columns)
-    indiv_hh_improved[u_value_columns] = improved_u_values_indexed
+        indiv_hh_improved = indiv_hh_improved.drop(columns=u_value_columns)
+        indiv_hh_improved[u_value_columns] = improved_u_values_indexed
 
     return indiv_hh_improved
-
-
-def update_ber_rating(indiv_hh: pd.DataFrame):
-    pass
 
 
 @st.cache
@@ -335,7 +350,6 @@ percentage_demand_met = (
     / 100
 )
 
-
 projected_la_housing_demand = project_la_housing_demand(esri_forecast)
 
 indiv_hh_new = simulate_new_housing(
@@ -346,32 +360,27 @@ indiv_hh_new = simulate_new_housing(
     year=year,
     random_state=42,
 )
-indiv_hh_at_year = pd.concat(
+indiv_hh_new_in_zone = pd.concat(
     [indiv_hh_in_zone, indiv_hh_new], join="inner"
-)  # only add new buildings that are in the selected zone
+)  # get new buildings that are in the selected zone
+indiv_hh_at_year = pd.concat([indiv_hh_in_zone, indiv_hh_new_in_zone]).dropna(how="all")
 
-regulatory_periods_selected = select_building_subset()
+periods_built_selected = select_building_subset()
 improvement = (
     st.slider(r"% Fabric Improvement of Subset", min_value=0, max_value=100) / 100
 )
-indiv_hh_subset = indiv_hh_at_year.query(
-    "regulatory_period == @regulatory_periods_selected"
-)
-indiv_hh_remaining = indiv_hh_at_year.query(
-    "regulatory_period != @regulatory_periods_selected"
-)
+indiv_hh_subset = indiv_hh_at_year.query("period_built == @periods_built_selected")
+indiv_hh_remaining = indiv_hh_at_year.query("period_built != @periods_built_selected")
 indiv_hh_improved = improve_housing_quality(indiv_hh_subset, improvement)
 
 indiv_hh = pd.concat([indiv_hh_improved, indiv_hh_remaining])
 
 indiv_hh_heat_mwh_per_year = calculate_heat_demand(indiv_hh)
-small_area_heat_mwh_per_year = (
-    indiv_hh_heat_mwh_per_year.groupby("SMALL_AREA").sum().round()
-)
+small_area_heat_mwh_per_year = indiv_hh_heat_mwh_per_year.groupby(level=0).sum().round()
 
 indiv_hh_heat_pump_viability = calculate_heat_pump_viability(indiv_hh)
 small_area_percentage_heat_pump_ready = (
-    indiv_hh_heat_pump_viability.groupby("SMALL_AREA")
+    indiv_hh_heat_pump_viability.groupby(level=0)
     .apply(lambda x: 100 * round(x.sum() / len(x), 2))
     .rename("percentage_heat_pump_ready")
 )
