@@ -90,6 +90,11 @@ def select_zone(indiv_hh: pd.DataFrame):
         "Select Electoral District", ELECTORAL_DISTRICTS
     )
 
+    if (electoral_district is not None) & (local_authority is not None):
+        raise ValueError(
+            "Cannot select both local_authority and electoral_district,"
+            " please unselect one of them!"
+        )
     if electoral_district:
         zone = electoral_district
         zone_type = "electoral_district"
@@ -152,6 +157,28 @@ def simulate_new_housing(
     return pd.concat([new_housing, archetype_broadcast], axis=1).set_index("SMALL_AREA")
 
 
+def select_building_subset() -> List[str]:
+    st.subheader("Select Building Subset for a Retrofit Scenario")
+    c1, c2, c3, c4, c5, c6, c7 = st.beta_columns(7)
+    before_1919 = "before 1970" if c1.checkbox("before 1970") else None
+    from_71_to_80 = "1971 - 1980" if c2.checkbox("1971 to 1980") else None
+    from_81_to_80 = "1981 - 1990" if c3.checkbox("1981 to 1990") else None
+    from_91_to_00 = "1991 - 2000" if c4.checkbox("1990 to 2000") else None
+    from_01_to_05 = "2001 - 2005" if c5.checkbox("2001 to 2005") else None
+    from_06_to_10 = "2006 - 2010" if c6.checkbox("2006 to 2010") else None
+    later_than_11 = "2011 or later" if c7.checkbox("2011 or later") else None
+    options_selected = [
+        before_1919,
+        from_71_to_80,
+        from_81_to_80,
+        from_91_to_00,
+        from_06_to_10,
+        from_06_to_10,
+        later_than_11,
+    ]
+    return [o for o in options_selected if o]
+
+
 @st.cache
 def improve_housing_quality(indiv_hh: pd.DataFrame, improvement: float) -> pd.DataFrame:
     indiv_hh_improved = indiv_hh.copy()
@@ -177,6 +204,10 @@ def improve_housing_quality(indiv_hh: pd.DataFrame, improvement: float) -> pd.Da
     indiv_hh_improved[u_value_columns] = improved_u_values_indexed
 
     return indiv_hh_improved
+
+
+def update_ber_rating(indiv_hh: pd.DataFrame):
+    pass
 
 
 @st.cache
@@ -299,13 +330,11 @@ percentage_demand_met = (
         "% Projected Housing Demand Built",
         min_value=0,
         max_value=100,
-        value=50,
+        value=0,
     )
     / 100
 )
-improvement = (
-    st.sidebar.slider("% Building Stock Improvement", min_value=0, max_value=100) / 100
-)
+
 
 projected_la_housing_demand = project_la_housing_demand(esri_forecast)
 
@@ -321,9 +350,19 @@ indiv_hh_at_year = pd.concat(
     [indiv_hh_in_zone, indiv_hh_new], join="inner"
 )  # only add new buildings that are in the selected zone
 
-indiv_hh_improved = improve_housing_quality(indiv_hh_at_year, improvement)
+regulatory_periods_selected = select_building_subset()
+improvement = (
+    st.slider(r"% Fabric Improvement of Subset", min_value=0, max_value=100) / 100
+)
+indiv_hh_subset = indiv_hh_at_year.query(
+    "regulatory_period == @regulatory_periods_selected"
+)
+indiv_hh_remaining = indiv_hh_at_year.query(
+    "regulatory_period != @regulatory_periods_selected"
+)
+indiv_hh_improved = improve_housing_quality(indiv_hh_subset, improvement)
 
-indiv_hh = indiv_hh_improved
+indiv_hh = pd.concat([indiv_hh_improved, indiv_hh_remaining])
 
 indiv_hh_heat_mwh_per_year = calculate_heat_demand(indiv_hh)
 small_area_heat_mwh_per_year = (
