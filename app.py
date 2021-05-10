@@ -377,12 +377,12 @@ small_area_percentage_heat_pump_ready = (
     .rename("percentage_heat_pump_ready")
 )
 
+total_selected_housing = len(indiv_hh_improved)
+total_projected_new_housing = len(indiv_hh_new)
+total_non_archetyped_housing = len(indiv_hh.query("archetype == 'none'"))
 total_housing = len(indiv_hh)
-total_new_housing = len(indiv_hh_new)
-total_heat_pump_reading_housing = indiv_hh_heat_pump_viability.sum()
-percentage_heat_pump_ready_housing = round(
-    100 * total_heat_pump_reading_housing / total_housing, 2
-)
+
+total_heat_pump_ready_housing = indiv_hh_heat_pump_viability.sum()
 total_heat_demand = round(indiv_hh_heat_mwh_per_year.sum(), 2)
 
 t1, t2 = st.beta_columns(2)
@@ -391,29 +391,58 @@ t1.markdown(
     f"""
     <table>
         <tr>
+            <th>Housing<br>Selected</th>
+            <td>{total_selected_housing}</td>
+            <td>{round(100 * total_selected_housing / total_housing, 2)}%</td>
+        </tr>
+        <tr>
+            <th>Projected<br>New Housing</th>
+            <td>{total_projected_new_housing}</td>
+            <td>{round(100 * total_projected_new_housing / total_housing, 2)}%</td>
+        </tr>
+        <tr>
+            <th>Non-Archetyped<sup>1</sup><br>Housing</th>
+            <td>{total_non_archetyped_housing}</td>
+            <td>{round(100 * total_non_archetyped_housing / total_housing, 2)}%</td>
+        </tr>
+        <tr>
             <th>Total Housing</th>
-            <td rowspan=2>{total_housing}</td>
-        <tr>
-        <tr>
-            <th>Heat Pump<br>Ready Housing</th>
-            <td>{total_heat_pump_reading_housing}</td>
-        <tr>
-        <tr>
-            <th>New Housing</th>
-            <td>{total_new_housing}</td>
-        <tr>
-        <tr>
-            <th>% Housing Ready<br>for Heat Pumps</th>
-            <td>{percentage_heat_pump_ready_housing}%</td>
-        <tr>
-            <th>Heat Demand<br>[MWh/year]</th>
-            <td>{total_heat_demand}</td>
-        <tr>
+            <td>{total_housing}</td>
+            <td>100%</td>
+        </tr>        
     </table>
-    <br>
+    <small><sup>1</sup>Buildings for which BER data is available</small></td>
     """,
     unsafe_allow_html=True,
 )
+
+t1.subheader("Demand Statistics")
+t1.markdown(
+    f"""
+    <table>
+        <tr>
+            <th>Heat Demand<br>[MWh/year]</th>
+            <td>{total_heat_demand}</td>
+        </tr>
+    </table>
+    """,
+    unsafe_allow_html=True,
+)
+
+t2.subheader("Heat Pump Statistics")
+t2.markdown(
+    f"""
+    <table>
+        <tr>
+            <th>Heat Pump<br>Ready Housing</th>
+            <td>{total_heat_pump_ready_housing}</td>
+            <td>{round(100 * total_heat_pump_ready_housing / total_housing, 2)}%</td>
+        </tr>
+    </table>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 t2.subheader("Overall BER Ratings")
 t2.markdown(
