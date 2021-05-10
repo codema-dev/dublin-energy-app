@@ -377,9 +377,10 @@ small_area_percentage_heat_pump_ready = (
     .rename("percentage_heat_pump_ready")
 )
 
-total_selected_housing = len(indiv_hh_improved)
-total_projected_new_housing = len(indiv_hh_new)
-total_non_archetyped_housing = len(indiv_hh.query("archetype == 'none'"))
+total_selected = len(indiv_hh_improved)
+total_non_archetyped_selected = len(indiv_hh_improved.query("archetype == 'none'"))
+total_projected_new = len(indiv_hh_new)
+total_non_archetyped = len(indiv_hh.query("archetype == 'none'"))
 total_housing = len(indiv_hh)
 
 total_heat_pump_ready_housing = indiv_hh_heat_pump_viability.sum()
@@ -391,22 +392,32 @@ t1.markdown(
     f"""
     <table>
         <tr>
-            <th>Housing<br>Selected</th>
-            <td>{total_selected_housing}</td>
-            <td>{round(100 * total_selected_housing / total_housing, 2)}%</td>
+            <td></td>
+            <th>Total</th>
+            <th>% of Total</th>
         </tr>
         <tr>
-            <th>Projected<br>New Housing</th>
-            <td>{total_projected_new_housing}</td>
-            <td>{round(100 * total_projected_new_housing / total_housing, 2)}%</td>
+            <th>Non-Archetyped<sup>1</sup> Housing Selected</th>
+            <td>{total_non_archetyped_selected}</td>
+            <td>{round(100 * total_non_archetyped_selected / total_housing, 2)}%</td>
         </tr>
         <tr>
-            <th>Non-Archetyped<sup>1</sup><br>Housing</th>
-            <td>{total_non_archetyped_housing}</td>
-            <td>{round(100 * total_non_archetyped_housing / total_housing, 2)}%</td>
+            <th>Housing Selected</th>
+            <td>{total_selected}</td>
+            <td>{round(100 * total_selected / total_housing, 2)}%</td>
         </tr>
         <tr>
-            <th>Total Housing</th>
+            <th>Projected New Housing</th>
+            <td>{total_projected_new}</td>
+            <td>{round(100 * total_projected_new / total_housing, 2)}%</td>
+        </tr>
+        <tr>
+            <th>Non-Archetyped<sup>1</sup> Housing</th>
+            <td>{total_non_archetyped}</td>
+            <td>{round(100 * total_non_archetyped / total_housing, 2)}%</td>
+        </tr>
+        <tr>
+            <th>Total</th>
             <td>{total_housing}</td>
             <td>100%</td>
         </tr>        
