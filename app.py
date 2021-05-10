@@ -13,6 +13,7 @@ import plotly.express as px
 import streamlit as st
 
 from dublin_energy_app.deap import calculate_heat_loss_parameter
+from dublin_energy_app import dashboard
 
 KWH_TO_MWH = 10 ** -3
 
@@ -194,38 +195,6 @@ def select_building_subset() -> List[str]:
 
 
 @st.cache
-def improve_housing_quality(indiv_hh: pd.DataFrame, improvement: float) -> pd.DataFrame:
-    indiv_hh_improved = indiv_hh.copy()
-
-    if indiv_hh_improved.empty:
-        indiv_hh_improved = pd.DataFrame()
-    else:
-        improvement = 1 - improvement
-        u_value_columns = [c for c in indiv_hh.columns if "uval" in c.lower()]
-        best_case_u_values = (
-            indiv_hh[u_value_columns].replace({0: np.nan}).min().to_frame().T.to_numpy()
-        )
-        current_u_values = indiv_hh[u_value_columns].to_numpy()
-        gap_to_target = current_u_values - best_case_u_values
-        improved_u_values = gap_to_target * improvement
-
-        improved_u_values = pd.DataFrame(improved_u_values, columns=u_value_columns)
-        improved_u_values_all_positive = improved_u_values.where(
-            improved_u_values >= 0, 0
-        )
-        small_areas = pd.Series(indiv_hh.index)
-        improved_u_values_indexed = pd.concat(
-            [small_areas, improved_u_values_all_positive],
-            axis=1,
-        ).set_index("SMALL_AREA")
-
-        indiv_hh_improved = indiv_hh_improved.drop(columns=u_value_columns)
-        indiv_hh_improved[u_value_columns] = improved_u_values_indexed
-
-    return indiv_hh_improved
-
-
-@st.cache
 def calculate_heat_demand(
     indiv_hh: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -371,9 +340,32 @@ improvement = (
 )
 indiv_hh_subset = indiv_hh_at_year.query("period_built == @periods_built_selected")
 indiv_hh_remaining = indiv_hh_at_year.query("period_built != @periods_built_selected")
-indiv_hh_improved = improve_housing_quality(indiv_hh_subset, improvement)
+indiv_hh_improved = dashboard.improve_housing_quality(
+    indiv_hh_subset,
+    improvement,
+    uvalue_columns=[
+        "Door Weighted Uvalue",
+        "Floor Weighted Uvalue",
+        "Roof Weighted Uvalue",
+        "Wall weighted Uvalue",
+        "WindowsWeighted Uvalue",
+    ],
+    target_uvalues={
+        "Door Weighted Uvalue": [0.1],
+        "Floor Weighted Uvalue": [0.05],
+        "Roof Weighted Uvalue": [0.01],
+        "Wall weighted Uvalue": [0.1],
+        "WindowsWeighted Uvalue": [0.4],
+    },
+)
 
 indiv_hh = pd.concat([indiv_hh_improved, indiv_hh_remaining])
+
+overall_ber_ratings = pd.cut(
+    indiv_hh["Energy Value"],
+    bins=[-np.inf, 75, 150, 225, 300, 360, 450, np.inf],
+    labels=["A", "B", "C", "D", "E", "F", "G"],
+).value_counts()
 
 indiv_hh_heat_mwh_per_year = calculate_heat_demand(indiv_hh)
 small_area_heat_mwh_per_year = indiv_hh_heat_mwh_per_year.groupby(level=0).sum().round()
@@ -393,7 +385,9 @@ percentage_heat_pump_ready_housing = round(
 )
 total_heat_demand = round(indiv_hh_heat_mwh_per_year.sum(), 2)
 
-st.markdown(
+t1, t2 = st.beta_columns(2)
+t1.subheader("Stock Statistics")
+t1.markdown(
     f"""
     <table>
         <tr>
@@ -401,7 +395,7 @@ st.markdown(
             <td rowspan=2>{total_housing}</td>
         <tr>
         <tr>
-            <th>Heat Pump Ready Housing</th>
+            <th>Heat Pump<br>Ready Housing</th>
             <td>{total_heat_pump_reading_housing}</td>
         <tr>
         <tr>
@@ -409,10 +403,10 @@ st.markdown(
             <td>{total_new_housing}</td>
         <tr>
         <tr>
-            <th>% Housing Ready for Heat Pumps</th>
+            <th>% Housing Ready<br>for Heat Pumps</th>
             <td>{percentage_heat_pump_ready_housing}%</td>
         <tr>
-            <th>Heat Demand [MWh/year]</th>
+            <th>Heat Demand<br>[MWh/year]</th>
             <td>{total_heat_demand}</td>
         <tr>
     </table>
@@ -421,7 +415,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-map_pressed = st.button("Generate Map?")
+t2.subheader("Overall BER Ratings")
+t2.markdown(
+    f"""
+    <table>
+        <tr>
+            <th>A</th>
+            <td>{overall_ber_ratings.loc["A"]}</td>
+        <tr>
+        <tr>
+            <th>B</th>
+            <td>{overall_ber_ratings.loc["B"]}</td>
+        <tr>
+        <tr>
+            <th>C</th>
+            <td>{overall_ber_ratings.loc["C"]}</td>
+        <tr>
+        <tr>
+            <th>D</th>
+            <td>{overall_ber_ratings.loc["D"]}</td>
+        <tr>
+        <tr>
+            <th>E</th>
+            <td>{overall_ber_ratings.loc["E"]}</td>
+        <tr>
+        <tr>
+            <th>F</th>
+            <td>{overall_ber_ratings.loc["F"]}</td>
+        <tr>
+        <tr>
+            <th>G</th>
+            <td>{overall_ber_ratings.loc["G"]}</td>
+        <tr>
+    </table>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.subheader("Map")
+map_pressed = st.button("Create Map of Building Stock?")
 if map_pressed:
     small_area_map = small_area_boundaries.join(small_area_heat_mwh_per_year).join(
         small_area_percentage_heat_pump_ready
