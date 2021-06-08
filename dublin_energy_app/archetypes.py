@@ -33,10 +33,23 @@ def estimate_type_of_wall(
     )
 
 
-def estimate_wall_uvalue(
+def estimate_uvalue_of_wall(
     known_indiv_hh: pd.DataFrame,
     unknown_indiv_hh: pd.DataFrame,
     wall_archetypes: pd.DataFrame,
-    index_columns: List[str],
 ) -> pd.DataFrame:
-    pass
+    estimated_indiv_hh = (
+        unknown_indiv_hh.reset_index()
+        .set_index(wall_archetypes.index.names)
+        .drop(columns="Wall weighted Uvalue")
+        .join(wall_archetypes)
+        .reset_index()
+        .set_index(known_indiv_hh.index.names)
+    )
+    on_columns = ["most_significant_wall_type", "Wall weighted Uvalue"]
+    return pd.concat(
+        [
+            known_indiv_hh[on_columns].assign(wall_uvalue_is_estimated=False),
+            estimated_indiv_hh[on_columns].assign(wall_uvalue_is_estimated=True),
+        ]
+    )
