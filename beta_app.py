@@ -30,12 +30,16 @@ LOCAL_AUTHORITIES = [
 @st.cache
 def load_building_stock(data_dir: Path) -> Tuple[DataFrame]:
     index_columns = ["SMALL_AREA", "dwelling_type", "period_built", "category_id"]
-    known_indiv_hh = pd.read_parquet(
-        data_dir / "dublin_indiv_hhs_known.parquet"
-    ).set_index(index_columns)
-    unknown_indiv_hh = pd.read_parquet(
-        data_dir / "dublin_indiv_hhs_unknown.parquet"
-    ).set_index(index_columns)
+    known_indiv_hh = (
+        pd.read_parquet(data_dir / "dublin_indiv_hhs_known.parquet")
+        .rename(columns={"Wall weighted Uvalue": "wall_uvalue"})
+        .set_index(index_columns)
+    )
+    unknown_indiv_hh = (
+        pd.read_parquet(data_dir / "dublin_indiv_hhs_unknown.parquet")
+        .rename(columns={"Wall weighted Uvalue": "wall_uvalue"})
+        .set_index(index_columns)
+    )
     return known_indiv_hh, unknown_indiv_hh
 
 
@@ -135,4 +139,9 @@ wall_types = archetypes.estimate_type_of_wall(
     unknown_indiv_hh,
     wall_type_archetypes,
     on=wall_type_archetypes.index.names,
+)
+wall_uvalue_defaults = archetypes.estimate_uvalue_of_wall(
+    known_indiv_hh,
+    unknown_indiv_hh,
+    wall_type_archetypes,
 )
