@@ -60,7 +60,7 @@ def test_estimate_uvalue_of_wall():
     known_indiv_hh_index = _create_index("000000001", index_names)
     known_indiv_hh = pd.DataFrame(
         {
-            "Wall weighted Uvalue": [0.3],
+            "uvalue_wall": [0.3],
             "most_significant_wall_type": ["300mm Filled Cavity"],
         },
         index=known_indiv_hh_index,
@@ -68,14 +68,14 @@ def test_estimate_uvalue_of_wall():
     unknown_indiv_hh_index = _create_index("000000002", index_names)
     unknown_indiv_hh = pd.DataFrame(
         {
-            "Wall weighted Uvalue": [np.nan],
+            "uvalue_wall": [np.nan],
             "most_significant_wall_type": ["Concrete Hollow Block"],
         },
         index=unknown_indiv_hh_index,
     )
     wall_archetypes = pd.DataFrame(
         {
-            "Wall weighted Uvalue": [2.4],
+            "uvalue_wall": [2.4],
         },
         index=pd.MultiIndex.from_product(
             [["Concrete Hollow Block"], ["1971 - 1980"]],
@@ -88,7 +88,7 @@ def test_estimate_uvalue_of_wall():
                 "300mm Filled Cavity",
                 "Concrete Hollow Block",
             ],
-            "Wall weighted Uvalue": [0.3, 2.4],
+            "uvalue_wall": [0.3, 2.4],
             "wall_uvalue_is_estimated": [False, True],
         },
         index=pd.MultiIndex.from_tuples(
