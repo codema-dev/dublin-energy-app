@@ -78,6 +78,7 @@ def test_replace_columns_with_other():
     )
     expected_output = pd.DataFrame(
         {
+            "most_significant_wall_type": ["Concrete Hollow Block"],
             "wall_uvalue": [2.4],
         },
         index=pd.MultiIndex.from_product(
