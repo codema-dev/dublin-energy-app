@@ -143,5 +143,5 @@ wall_types = archetypes.estimate_type_of_wall(
 wall_uvalue_defaults = archetypes.estimate_uvalue_of_wall(
     known_indiv_hh,
     unknown_indiv_hh,
-    wall_type_archetypes,
+    wall_uvalue_defaults,
 )
