@@ -33,10 +33,20 @@ def load_building_stock(data_dir: Path) -> Tuple[DataFrame]:
     known_indiv_hh = (
         pd.read_parquet(data_dir / "dublin_indiv_hhs_known.parquet")
         .rename(columns={"Wall weighted Uvalue": "wall_uvalue"})
+        .assign(
+            most_significant_wall_type=lambda df: df[
+                "most_significant_wall_type"
+            ].str.lower()
+        )
         .set_index(index_columns)
     )
     unknown_indiv_hh = (
         pd.read_parquet(data_dir / "dublin_indiv_hhs_unknown.parquet")
+        .assign(
+            most_significant_wall_type=lambda df: df[
+                "most_significant_wall_type"
+            ].str.lower()
+        )
         .rename(columns={"Wall weighted Uvalue": "wall_uvalue"})
         .set_index(index_columns)
     )
@@ -53,13 +63,27 @@ def load_geodata(data_dir: Path) -> Tuple[GeoDataFrame]:
 @st.cache
 def load_archetypes(data_dir: Path) -> Tuple[DataFrame]:
 
-    wall_type_archetypes = pd.read_csv(
-        data_dir / "most_common_wall_types_by_archetype.csv",
-    ).set_index(["dwelling_type", "period_built"])
+    wall_type_archetypes = (
+        pd.read_csv(
+            data_dir / "most_common_wall_types_by_archetype.csv",
+        )
+        .assign(
+            most_significant_wall_type=lambda df: df[
+                "most_significant_wall_type"
+            ].str.lower()
+        )
+        .set_index(["dwelling_type", "period_built"])
+    )
 
-    wall_uvalue_defaults = pd.read_csv(
-        data_dir / "deap-default-wall-uvalues-by-period-built.csv"
-    ).set_index(["most_significant_wall_type", "period_built"])
+    wall_uvalue_defaults = (
+        pd.read_csv(data_dir / "deap-default-wall-uvalues-by-period-built.csv")
+        .assign(
+            most_significant_wall_type=lambda df: df[
+                "most_significant_wall_type"
+            ].str.lower()
+        )
+        .set_index(["most_significant_wall_type", "period_built"])
+    )
 
     with open(data_dir / "archetype_new_build.json", "r") as file:
         new_build_archetype = pd.Series(json.load(file))
@@ -143,5 +167,6 @@ wall_types = archetypes.estimate_type_of_wall(
 wall_uvalue_defaults = archetypes.estimate_uvalue_of_wall(
     known_indiv_hh,
     unknown_indiv_hh,
+    wall_types,
     wall_uvalue_defaults,
 )
