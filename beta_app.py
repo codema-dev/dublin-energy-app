@@ -140,8 +140,24 @@ wall_types = archetypes.estimate_type_of_wall(
     wall_type_archetypes,
     on=wall_type_archetypes.index.names,
 )
-wall_uvalue_defaults = archetypes.estimate_uvalue_of_wall(
+wall_uvalues = archetypes.estimate_uvalue_of_wall(
     known_indiv_hh,
     unknown_indiv_hh,
+    wall_types,
     wall_uvalue_defaults,
+)
+measures_by_wall_category = load_retrofit_measures(data_dir)
+x = {
+    "300mm filled cavity": "cavity",
+    "concrete hollow block": "hollow block",
+    "300mm cavity": "cavity",
+    "225mm solid brick": "solid brick",
+    "solid mass concrete": "mass concrete",
+    "stone": "stone",
+    "timber frame": "timber frame",
+    "325mm solid brick": "solid brick",
+}
+wall_uvalues["wall_category"] = wall_uvalues["most_significant_wall_type"].map(x)
+wall_measures = wall_uvalues.reset_index().merge(
+    measures_by_wall_category, left_on="wall_category", right_on="wall_type", how="left"
 )
