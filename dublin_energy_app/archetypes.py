@@ -33,20 +33,30 @@ def estimate_type_of_wall(
     )
 
 
+def _replace_columns_with_other(
+    unknown_indiv_hh: pd.DataFrame,
+    estimates: pd.DataFrame,
+) -> pd.DataFrame:
+    return (
+        unknown_indiv_hh.reset_index()
+        .drop(columns=estimates.columns)
+        .set_index(estimates.index.names)
+        .join(estimates)
+        .set_index(unknown_indiv_hh.index.names)
+    )
+
+
 def estimate_uvalue_of_wall(
     known_indiv_hh: pd.DataFrame,
     unknown_indiv_hh: pd.DataFrame,
-    wall_archetypes: pd.DataFrame,
+    wall_types: pd.DataFrame,
+    wall_uvalue_defaults: pd.DataFrame,
 ) -> pd.DataFrame:
-    estimated_indiv_hh = (
-        unknown_indiv_hh.reset_index()
-        .set_index(wall_archetypes.index.names)
-        .drop(columns="uvalue_wall")
-        .join(wall_archetypes)
-        .reset_index()
-        .set_index(known_indiv_hh.index.names)
-    )
-    on_columns = ["most_significant_wall_type", "uvalue_wall"]
+    estimated_indiv_hh = unknown_indiv_hh.pipe(
+        _replace_columns_with_estimates, wall_types
+    ).pipe(_replace_columns_with_estimates, wall_uvalue_defaults)
+
+    on_columns = ["most_significant_wall_type", "wall_uvalue"]
     return pd.concat(
         [
             known_indiv_hh[on_columns].assign(wall_uvalue_is_estimated=False),
