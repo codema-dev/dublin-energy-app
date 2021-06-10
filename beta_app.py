@@ -158,15 +158,9 @@ if st.checkbox("Show wall archetypes?"):
         wall_type_archetypes.reset_index().pipe(_convert_categorical_columns_to_str)
     )
 
-wall_types = archetypes.estimate_type_of_wall(
-    known_indiv_hh,
-    unknown_indiv_hh,
-    wall_type_archetypes,
-    on=wall_type_archetypes.index.names,
-)
-wall_uvalue_defaults = archetypes.estimate_uvalue_of_wall(
-    known_indiv_hh,
-    unknown_indiv_hh,
-    wall_types,
-    wall_uvalue_defaults,
+wall_uvalues = archetypes.estimate_wall_properties(
+    known_indiv_hh=known_indiv_hh,
+    unknown_indiv_hh=unknown_indiv_hh,
+    wall_type_archetypes=wall_type_archetypes,
+    wall_uvalue_defaults=wall_uvalue_defaults,
 )
