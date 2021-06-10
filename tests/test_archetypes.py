@@ -1,158 +1,181 @@
 import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
+import pytest
 
 from dublin_energy_app import archetypes
 
 
-def _create_index(small_area, index_names):
-    return pd.MultiIndex.from_product(
-        [[small_area], ["Semi-detached house"], ["1971 - 1980"], [1]],
-        names=index_names,
+@pytest.fixture
+def known_indiv_hh() -> pd.DataFrame:
+    return pd.DataFrame(
+        {"most_significant_wall_type": ["300mm filled cavity"], "wall_uvalue": [0.3]},
+        index=pd.MultiIndex.from_product(
+            [["000000001"], ["Semi-detached house"], ["1971 - 1980"], [1]],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
+        ),
     )
 
 
-def test_estimate_type_of_wall():
-    index_names = ["SMALL_AREA", "dwelling_type", "period_built", "category_id"]
-    known_indiv_hh_index = _create_index("000000001", index_names)
-    known_indiv_hh = pd.DataFrame(
-        {"most_significant_wall_type": ["300mm Filled Cavity"]},
-        index=known_indiv_hh_index,
+@pytest.fixture
+def unknown_indiv_hh() -> pd.DataFrame:
+    return pd.DataFrame(
+        {"most_significant_wall_type": [np.nan], "wall_uvalue": [np.nan]},
+        index=pd.MultiIndex.from_product(
+            [["000000002"], ["Semi-detached house"], ["1971 - 1980"], [1]],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
+        ),
     )
-    unknown_indiv_hh_index = _create_index("000000002", index_names)
-    unknown_indiv_hh = pd.DataFrame(
-        {"most_significant_wall_type": [np.nan]},
-        index=unknown_indiv_hh_index,
+
+
+@pytest.fixture
+def wall_uvalue_defaults() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "wall_uvalue": [2.4],
+        },
+        index=pd.MultiIndex.from_product(
+            [["concrete hollow block"], ["1971 - 1980"]],
+            names=["most_significant_wall_type", "period_built"],
+        ),
     )
-    wall_archetypes = pd.DataFrame(
-        {"most_significant_wall_type": ["Concrete Hollow Block"]},
+
+
+@pytest.fixture
+def wall_type_archetypes() -> pd.DataFrame:
+    return pd.DataFrame(
+        {"most_significant_wall_type": ["concrete hollow block"]},
         index=pd.MultiIndex.from_product(
             [["Semi-detached house"], ["1971 - 1980"]],
             names=["dwelling_type", "period_built"],
         ),
     )
+
+
+def test_fill_empty_columns_with_archetypes(unknown_indiv_hh, wall_type_archetypes):
+    expected_output = pd.DataFrame(
+        {
+            "most_significant_wall_type": ["concrete hollow block"],
+            "wall_uvalue": [np.nan],
+        },
+        index=unknown_indiv_hh.index,
+    )
+
+    output = archetypes._fill_empty_columns_with_archetypes(
+        unknown_indiv_hh, wall_type_archetypes
+    )
+
+    assert_frame_equal(output, expected_output, check_like=True)
+
+
+def test_estimate_type_of_wall(known_indiv_hh, unknown_indiv_hh, wall_type_archetypes):
     expected_output = pd.DataFrame(
         {
             "most_significant_wall_type": [
-                "300mm Filled Cavity",
-                "Concrete Hollow Block",
+                "300mm filled cavity",
+                "concrete hollow block",
             ],
             "wall_type_is_estimated": [False, True],
+            "wall_uvalue": [0.3, np.nan],
         },
-        index=pd.MultiIndex.from_tuples(
-            [*known_indiv_hh_index.to_list(), *unknown_indiv_hh_index.to_list()],
-            names=index_names,
+        index=pd.MultiIndex.from_arrays(
+            [
+                ["000000001", "000000002"],
+                ["Semi-detached house", "Semi-detached house"],
+                ["1971 - 1980", "1971 - 1980"],
+                [1, 1],
+            ],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
         ),
     )
 
-    output = archetypes.estimate_type_of_wall(
+    output = archetypes._estimate_type_of_wall(
         known_indiv_hh=known_indiv_hh,
         unknown_indiv_hh=unknown_indiv_hh,
-        wall_archetypes=wall_archetypes,
-        on=["dwelling_type", "period_built"],
+        wall_type_archetypes=wall_type_archetypes,
     )
 
-    assert_frame_equal(output, expected_output)
+    assert_frame_equal(output, expected_output, check_like=True)
 
 
-def test_replace_columns_with_other():
-    index_names = ["SMALL_AREA", "dwelling_type", "period_built", "category_id"]
-    unknown_indiv_hh = pd.DataFrame(
-        {
-            "most_significant_wall_type": ["Concrete Hollow Block"],
-            "wall_uvalue": [np.nan],
-        },
-        index=pd.MultiIndex.from_product(
-            [["000000002"], ["Semi-detached house"], ["1971 - 1980"], [1]],
-            names=index_names,
-        ),
-    )
-    wall_uvalue_defaults = pd.DataFrame(
-        {
-            "wall_uvalue": [2.4],
-        },
-        index=pd.MultiIndex.from_product(
-            [["Concrete Hollow Block"], ["1971 - 1980"]],
-            names=["most_significant_wall_type", "period_built"],
-        ),
-    )
-    expected_output = pd.DataFrame(
-        {
-            "most_significant_wall_type": ["Concrete Hollow Block"],
-            "wall_uvalue": [2.4],
-        },
-        index=pd.MultiIndex.from_product(
-            [["000000002"], ["Semi-detached house"], ["1971 - 1980"], [1]],
-            names=index_names,
-        ),
-    )
-
-    output = archetypes._replace_columns_with_other(
-        unknown_indiv_hh, wall_uvalue_defaults
-    )
-
-    assert_frame_equal(output, expected_output)
-
-
-def test_estimate_uvalue_of_wall():
-    index_names = ["SMALL_AREA", "dwelling_type", "period_built", "category_id"]
-    unknown_indiv_hh_index = _create_index("000000002", index_names)
-    known_indiv_hh_index = _create_index("000000001", index_names)
-    expected_output_index = pd.MultiIndex.from_tuples(
-        [*known_indiv_hh_index.to_list(), *unknown_indiv_hh_index.to_list()],
-        names=index_names,
-    )
-
-    known_indiv_hh = pd.DataFrame(
-        {
-            "wall_uvalue": [0.3],
-            "most_significant_wall_type": ["300mm Filled Cavity"],
-        },
-        index=known_indiv_hh_index,
-    )
-    unknown_indiv_hh = pd.DataFrame(
-        {
-            "wall_uvalue": [np.nan],
-            "most_significant_wall_type": [np.nan],
-        },
-        index=unknown_indiv_hh_index,
-    )
-    wall_uvalue_defaults = pd.DataFrame(
-        {
-            "wall_uvalue": [2.4],
-        },
-        index=pd.MultiIndex.from_product(
-            [["Concrete Hollow Block"], ["1971 - 1980"]],
-            names=["most_significant_wall_type", "period_built"],
-        ),
-    )
+def test_estimate_uvalue_of_wall(wall_uvalue_defaults):
     wall_types = pd.DataFrame(
         {
             "most_significant_wall_type": [
-                "300mm Filled Cavity",
-                "Concrete Hollow Block",
+                "concrete hollow block",
+                "300mm filled cavity",
             ],
-            "wall_type_is_estimated": [False, True],
+            "wall_type_is_estimated": [True, False],
+            "wall_uvalue": [np.nan, 0.3],
         },
-        index=expected_output_index,
+        index=pd.MultiIndex.from_arrays(
+            [
+                ["000000001", "000000002"],
+                ["Semi-detached house", "Semi-detached house"],
+                ["1971 - 1980", "1971 - 1980"],
+                [1, 1],
+            ],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
+        ),
     )
     expected_output = pd.DataFrame(
         {
             "most_significant_wall_type": [
-                "300mm Filled Cavity",
-                "Concrete Hollow Block",
+                "concrete hollow block",
+                "300mm filled cavity",
             ],
-            "wall_uvalue": [0.3, 2.4],
-            "wall_uvalue_is_estimated": [False, True],
+            "wall_type_is_estimated": [True, False],
+            "wall_uvalue": [2.4, 0.3],
+            "wall_uvalue_is_estimated": [True, False],
         },
-        index=expected_output_index,
+        index=pd.MultiIndex.from_arrays(
+            [
+                ["000000001", "000000002"],
+                ["Semi-detached house", "Semi-detached house"],
+                ["1971 - 1980", "1971 - 1980"],
+                [1, 1],
+            ],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
+        ),
     )
 
-    output = archetypes.estimate_uvalue_of_wall(
-        known_indiv_hh=known_indiv_hh,
-        unknown_indiv_hh=unknown_indiv_hh,
+    output = archetypes._estimate_uvalue_of_wall(
         wall_types=wall_types,
         wall_uvalue_defaults=wall_uvalue_defaults,
     )
 
-    assert_frame_equal(output, expected_output)
+    assert_frame_equal(output, expected_output, check_like=True)
+
+
+def test_estimate_wall_properties(
+    known_indiv_hh, unknown_indiv_hh, wall_type_archetypes, wall_uvalue_defaults
+):
+    expected_output = pd.DataFrame(
+        {
+            "most_significant_wall_type": [
+                "300mm filled cavity",
+                "concrete hollow block",
+            ],
+            "wall_type_is_estimated": [False, True],
+            "wall_uvalue": [0.3, 2.4],
+            "wall_uvalue_is_estimated": [False, True],
+        },
+        index=pd.MultiIndex.from_arrays(
+            [
+                ["000000001", "000000002"],
+                ["Semi-detached house", "Semi-detached house"],
+                ["1971 - 1980", "1971 - 1980"],
+                [1, 1],
+            ],
+            names=["SMALL_AREA", "dwelling_type", "period_built", "category_id"],
+        ),
+    )
+
+    output = archetypes.estimate_wall_properties(
+        known_indiv_hh=known_indiv_hh,
+        unknown_indiv_hh=unknown_indiv_hh,
+        wall_type_archetypes=wall_type_archetypes,
+        wall_uvalue_defaults=wall_uvalue_defaults,
+    )
+
+    assert_frame_equal(output, expected_output, check_like=True)

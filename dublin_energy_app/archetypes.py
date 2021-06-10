@@ -1,14 +1,32 @@
 from typing import List
 
+import numpy as np
 import pandas as pd
 
 
-def estimate_type_of_wall(
+def _fill_empty_columns_with_archetypes(
+    unknown_indiv_hh: pd.DataFrame,
+    archetypes: pd.DataFrame,
+) -> pd.DataFrame:
+    drop_columns = [
+        c for c in archetypes.columns if c in unknown_indiv_hh.reset_index().columns
+    ]
+    return (
+        unknown_indiv_hh.reset_index()
+        .drop(columns=drop_columns)
+        .set_index(archetypes.index.names)
+        .join(archetypes)
+        .reset_index()
+        .set_index(unknown_indiv_hh.index.names)
+    )
+
+
+def _estimate_type_of_wall(
     known_indiv_hh: pd.DataFrame,
     unknown_indiv_hh: pd.DataFrame,
-    wall_archetypes: pd.DataFrame,
-    on: List[str],
+    wall_type_archetypes: pd.DataFrame,
 ) -> pd.DataFrame:
+
     wall_type_is_known = known_indiv_hh["most_significant_wall_type"].notnull()
     unknown_wall_types = pd.concat(
         [
@@ -16,57 +34,51 @@ def estimate_type_of_wall(
             unknown_indiv_hh["most_significant_wall_type"],
         ]
     )
-    estimated_wall_types = (
-        unknown_wall_types.reset_index()
-        .set_index(on)
-        .combine_first(wall_archetypes)
-        .reset_index()
-        .set_index(known_indiv_hh.index.names)
+    estimated_wall_types = _fill_empty_columns_with_archetypes(
+        unknown_wall_types, wall_type_archetypes
     )
     return pd.concat(
         [
-            known_indiv_hh[wall_type_is_known][["most_significant_wall_type"]].assign(
-                wall_type_is_estimated=False
+            known_indiv_hh[wall_type_is_known][
+                ["wall_uvalue", "most_significant_wall_type"]
+            ].assign(wall_type_is_estimated=False),
+            estimated_wall_types.assign(
+                wall_type_is_estimated=True, wall_uvalue=np.nan
             ),
-            estimated_wall_types.assign(wall_type_is_estimated=True),
         ]
     )
 
 
-def _replace_columns_with_other(
-    unknown_indiv_hh: pd.DataFrame,
-    estimates: pd.DataFrame,
-) -> pd.DataFrame:
-    drop_columns = [
-        c for c in estimates.columns if c in unknown_indiv_hh.reset_index().columns
-    ]
-    return (
-        unknown_indiv_hh.reset_index()
-        .drop(columns=drop_columns)
-        .set_index(estimates.index.names)
-        .join(estimates)
-        .reset_index()
-        .set_index(unknown_indiv_hh.index.names)
-    )
-
-
-def estimate_uvalue_of_wall(
-    known_indiv_hh: pd.DataFrame,
-    unknown_indiv_hh: pd.DataFrame,
+def _estimate_uvalue_of_wall(
     wall_types: pd.DataFrame,
     wall_uvalue_defaults: pd.DataFrame,
 ) -> pd.DataFrame:
-    estimated_indiv_hh_with_wall_types = _replace_columns_with_other(
-        unknown_indiv_hh, wall_types
-    )
-    estimated_indiv_hh = _replace_columns_with_other(
-        estimated_indiv_hh_with_wall_types, wall_uvalue_defaults
-    )
+    wall_uvalue_is_estimated = wall_types["wall_uvalue"].isnull()
+    known_wall_uvalues = wall_types[~wall_uvalue_is_estimated]
+    unknown_wall_uvalues = wall_types[wall_uvalue_is_estimated]
 
-    on_columns = ["most_significant_wall_type", "wall_uvalue"]
+    estimated_wall_uvalues = _fill_empty_columns_with_archetypes(
+        unknown_wall_uvalues, wall_uvalue_defaults
+    )
     return pd.concat(
         [
-            known_indiv_hh[on_columns].assign(wall_uvalue_is_estimated=False),
-            estimated_indiv_hh[on_columns].assign(wall_uvalue_is_estimated=True),
+            known_wall_uvalues.assign(wall_uvalue_is_estimated=False),
+            estimated_wall_uvalues.assign(wall_uvalue_is_estimated=True),
         ]
+    )
+
+
+def estimate_wall_properties(
+    known_indiv_hh: pd.DataFrame,
+    unknown_indiv_hh: pd.DataFrame,
+    wall_type_archetypes: pd.DataFrame,
+    wall_uvalue_defaults: pd.DataFrame,
+):
+    wall_types = _estimate_type_of_wall(
+        known_indiv_hh=known_indiv_hh,
+        unknown_indiv_hh=unknown_indiv_hh,
+        wall_type_archetypes=wall_type_archetypes,
+    )
+    return _estimate_uvalue_of_wall(
+        wall_types=wall_types, wall_uvalue_defaults=wall_uvalue_defaults
     )
