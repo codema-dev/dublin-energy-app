@@ -2,3 +2,4 @@ geopandas
 streamlit
 plotly
 pandas-stubs
+rc_building_model
