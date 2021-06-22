@@ -43,7 +43,7 @@ def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
 
 
 known_indiv_hh = (
-    pd.read_parquet(data_dir / "dublin_indiv_hhs_known.parquet")
+    pd.read_parquet(data_dir / "ber-dublin.parquet")
     .rename(columns=column_names)
     .reset_index()
 )
