@@ -2,4 +2,5 @@ geopandas
 streamlit
 plotly
 pandas-stubs
+
 git+git://github.com/codema-dev/rc-building-model
