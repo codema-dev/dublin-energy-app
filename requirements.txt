@@ -1,0 +1,4 @@
+geopandas
+streamlit
+plotly
+pandas-stubs

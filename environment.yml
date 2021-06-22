@@ -1,9 +1,0 @@
-name: hea
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - geopandas
-  - plotly
-  - streamlit
-  - pandas-stubs
