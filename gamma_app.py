@@ -116,9 +116,13 @@ total_floor_area = (
 
 fabric_heat_loss_pre_retrofit = calculate_fabric_heat_loss(pre_retrofitted_stock)
 
+st.subheader("Walls")
 percentage_walls_retrofitted = (
-    st.slider(r"% of Walls retrofitted", min_value=0, max_value=100, value=50) / 100
+    st.slider(r"% retrofitted", min_value=0, max_value=100, value=50) / 100
 )
+c1, c2 = st.beta_columns(2)
+c1.number_input(label="Lower Cost")
+c2.number_input(label="Upper Cost")
 retrofitted_stock["wall_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_walls_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
@@ -126,9 +130,13 @@ retrofitted_stock["wall_uvalue"] = retrofit_fabric(
     original_uvalues=pre_retrofitted_stock["wall_uvalue"],
 )
 
+st.subheader("Roofs")
 percentage_roofs_retrofitted = (
-    st.slider(r"% of Roofs retrofitted", min_value=0, max_value=100, value=0) / 100
+    st.slider(r"% retrofitted ", min_value=0, max_value=100, value=0) / 100
 )
+c1, c2 = st.beta_columns(2)
+c1.number_input(label="Lower Cost ")
+c2.number_input(label="Upper Cost ")
 retrofitted_stock["roof_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_roofs_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
@@ -136,10 +144,14 @@ retrofitted_stock["roof_uvalue"] = retrofit_fabric(
     original_uvalues=pre_retrofitted_stock["roof_uvalue"],
 )
 
+st.subheader("Windows|Doors")
 percentage_windows_doors_retrofitted = (
-    st.slider(r"% of Windows|Doors retrofitted", min_value=0, max_value=100, value=0)
-    / 100
+    st.slider(r"% retrofitted  ", min_value=0, max_value=100, value=0) / 100
 )
+c1, c2 = st.beta_columns(2)
+c1.number_input(label="Lower Cost  ")
+c2.number_input(label="Upper Cost  ")
+
 retrofitted_stock["window_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_windows_doors_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
@@ -180,3 +192,11 @@ c3.write(ber_ratings_after.astype(str).value_counts().sort_index())
 c4.write(
     ber_ratings_after.pipe(assign_ber_bandas).astype(str).value_counts().sort_index()
 )
+
+st.subheader("Component Costings")
+c1, c2, c3 = st.beta_columns(3)
+c1.write("Walls")
+c2.write("Roofs")
+c3.write("Windows|Doors")
+st.subheader("Total Cost")
+st.write("blah euro")
