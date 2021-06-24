@@ -36,7 +36,21 @@ def retrofit_fabric(
     number_retrofitted = int(percentage_retrofitted * total_number_of_hhs)
     retrofitted_uvalues = pd.Series([new_uvalue] * number_retrofitted)
     unretrofitted_uvalues = original_uvalues.iloc[number_retrofitted:]
-    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues])
+    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues]).reset_index(
+        drop=True
+    )
+
+
+def cost_fabric_retrofits(
+    percentage_retrofitted: float,
+    total_number_of_hhs: int,
+    cost: float,
+) -> pd.Series:
+    number_retrofitted = int(percentage_retrofitted * total_number_of_hhs)
+    number_unretrofitted = total_number_of_hhs - number_retrofitted
+    retrofit_cost = pd.Series([cost] * number_retrofitted)
+    unretrofitted_cost = pd.Series([0] * number_unretrofitted)
+    return pd.concat([retrofit_cost, unretrofitted_cost]).reset_index(drop=True)
 
 
 def assign_ber_ratings(energy_values: pd.Series):
@@ -121,13 +135,29 @@ percentage_walls_retrofitted = (
     st.slider(r"% retrofitted", min_value=0, max_value=100, value=50) / 100
 )
 c1, c2 = st.beta_columns(2)
-c1.number_input(label="Lower Cost")
-c2.number_input(label="Upper Cost")
+lower_cost_wall_retrofits = c1.number_input(label="Lower Cost", min_value=0, value=50)
+upper_cost_wall_retrofits = c2.number_input(label="Upper Cost", min_value=0, value=300)
 retrofitted_stock["wall_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_walls_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
     new_uvalue=0.2,
     original_uvalues=pre_retrofitted_stock["wall_uvalue"],
+)
+retrofitted_stock["wall_retrofit_lower_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_walls_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=lower_cost_wall_retrofits,
+    )
+    * total_floor_area
+)
+retrofitted_stock["wall_retrofit_upper_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_walls_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=upper_cost_wall_retrofits,
+    )
+    * total_floor_area
 )
 
 st.subheader("Roofs")
@@ -135,13 +165,29 @@ percentage_roofs_retrofitted = (
     st.slider(r"% retrofitted ", min_value=0, max_value=100, value=0) / 100
 )
 c1, c2 = st.beta_columns(2)
-c1.number_input(label="Lower Cost ")
-c2.number_input(label="Upper Cost ")
+lower_cost_roof_retrofits = c1.number_input(label="Lower Cost ", min_value=0, value=5)
+upper_cost_roof_retrofits = c2.number_input(label="Upper Cost ", min_value=0, value=30)
 retrofitted_stock["roof_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_roofs_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
     new_uvalue=0.13,
     original_uvalues=pre_retrofitted_stock["roof_uvalue"],
+)
+retrofitted_stock["roof_retrofit_lower_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_walls_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=lower_cost_wall_retrofits,
+    )
+    * total_floor_area
+)
+retrofitted_stock["roof_retrofit_upper_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_roofs_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=upper_cost_roof_retrofits,
+    )
+    * total_floor_area
 )
 
 st.subheader("Windows|Doors")
@@ -149,9 +195,12 @@ percentage_windows_doors_retrofitted = (
     st.slider(r"% retrofitted  ", min_value=0, max_value=100, value=0) / 100
 )
 c1, c2 = st.beta_columns(2)
-c1.number_input(label="Lower Cost  ")
-c2.number_input(label="Upper Cost  ")
-
+lower_cost_windows_doors_retrofits = c1.number_input(
+    label="Lower Cost  ", min_value=0, value=30
+)
+upper_cost_windows_doors_retrofits = c2.number_input(
+    label="Upper Cost  ", min_value=0, value=160
+)
 retrofitted_stock["window_uvalue"] = retrofit_fabric(
     percentage_retrofitted=percentage_windows_doors_retrofitted,
     total_number_of_hhs=total_number_of_hhs,
@@ -163,6 +212,22 @@ retrofitted_stock["door_uvalue"] = retrofit_fabric(
     total_number_of_hhs=total_number_of_hhs,
     new_uvalue=2,
     original_uvalues=pre_retrofitted_stock["door_uvalue"],
+)
+retrofitted_stock["window_doors_retrofit_lower_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_walls_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=lower_cost_windows_doors_retrofits,
+    )
+    * total_floor_area
+)
+retrofitted_stock["window_doors_retrofit_upper_cost"] = (
+    cost_fabric_retrofits(
+        percentage_retrofitted=percentage_windows_doors_retrofitted,
+        total_number_of_hhs=total_number_of_hhs,
+        cost=upper_cost_windows_doors_retrofits,
+    )
+    * total_floor_area
 )
 
 fabric_heat_loss_post_retrofit = calculate_fabric_heat_loss(retrofitted_stock)
