@@ -9,6 +9,24 @@ import streamlit as st
 
 data_dir = Path("data")
 
+EXPECTED_COLUMNS = [
+    "energy_value",
+    "roof_area",
+    "roof_uvalue",
+    "wall_area",
+    "wall_uvalue",
+    "floor_area",
+    "floor_uvalue",
+    "window_area",
+    "window_uvalue",
+    "door_area",
+    "door_uvalue",
+    "ground_floor_area",
+    "first_floor_area",
+    "second_floor_area",
+    "third_floor_area",
+]
+
 
 def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
     heat_loss_w_k = fab.calculate_fabric_heat_loss(
@@ -110,7 +128,9 @@ def assign_ber_bandas(energy_ratings):
 
 @st.cache
 def load_data():
-    return pd.read_csv("data/dublin_small_area_bers.csv")
+    bers = pd.read_csv("data/dublin_small_area_bers.csv")
+    assert set(EXPECTED_COLUMNS).issubset(bers.columns)
+    return bers
 
 
 ## Load Data
@@ -126,7 +146,7 @@ total_floor_area = (
     + pre_retrofitted_stock["third_floor_area"]
 )
 
-## Calculate Retrofit BER Impact
+## Calculate Retrofit BER Impact & Estimate Cost
 
 fabric_heat_loss_pre_retrofit = calculate_fabric_heat_loss(pre_retrofitted_stock)
 
@@ -177,7 +197,7 @@ retrofitted_stock["roof_retrofit_lower_cost"] = (
     cost_fabric_retrofits(
         percentage_retrofitted=percentage_roofs_retrofitted,
         total_number_of_hhs=total_number_of_hhs,
-        cost=lower_cost_wall_retrofits,
+        cost=lower_cost_roof_retrofits,
     )
     * total_floor_area
 )
@@ -245,6 +265,9 @@ ber_ratings_before = assign_ber_ratings(
 )
 ber_ratings_after = assign_ber_ratings(retrofitted_energy_values.rename("total"))
 
+
+## Display Retrofit BER Impact
+
 st.subheader("BER Ratings")
 c1, c2, c3, c4 = st.beta_columns(4)
 c1.write("Before")
@@ -257,6 +280,9 @@ c3.write(ber_ratings_after.astype(str).value_counts().sort_index())
 c4.write(
     ber_ratings_after.pipe(assign_ber_bandas).astype(str).value_counts().sort_index()
 )
+
+
+## Display Retrofit Component Costings
 
 st.subheader("Component Costings")
 c1, c2, c3 = st.beta_columns(3)
@@ -281,7 +307,7 @@ total_window_door_retrofit_cost_upper = (
 st.dataframe(
     pd.DataFrame(
         {
-            "Lower": [
+            "Lower [M€]": [
                 total_wall_retrofit_cost_lower,
                 total_roof_retrofit_cost_lower,
                 total_window_door_retrofit_cost_lower,
@@ -289,7 +315,7 @@ st.dataframe(
                 + total_roof_retrofit_cost_lower
                 + total_window_door_retrofit_cost_lower,
             ],
-            "Upper": [
+            "Upper [M€]": [
                 total_wall_retrofit_cost_upper,
                 total_roof_retrofit_cost_upper,
                 total_window_door_retrofit_cost_upper,
