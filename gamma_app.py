@@ -126,16 +126,23 @@ def assign_ber_bandas(energy_ratings):
     )
 
 
+def _fetch(url: str, filepath: Path):
+    if not filepath.exists():
+        urlretrieve(url=url, filename=filepath)
+
+
 @st.cache
-def load_data():
-    bers = pd.read_csv("data/dublin_small_area_bers.csv")
+def fetch_bers():
+    filepath = Path("bers.csv")
+    _fetch(url="https://storage.googleapis.com/codema-dev/bers.csv", filepath=filepath)
+    bers = pd.read_csv(filepath)
     assert set(EXPECTED_COLUMNS).issubset(bers.columns)
     return bers
 
 
 ## Load Data
 
-pre_retrofitted_stock = load_data()
+pre_retrofitted_stock = fetch_bers()
 retrofitted_stock = pre_retrofitted_stock.copy()
 total_number_of_hhs = len(pre_retrofitted_stock)
 
