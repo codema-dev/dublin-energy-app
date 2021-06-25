@@ -1,6 +1,3 @@
-geopandas
 streamlit
-plotly
-pandas-stubs
-
+pandas
 git+git://github.com/codema-dev/rc-building-model
