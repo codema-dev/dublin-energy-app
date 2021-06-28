@@ -31,6 +31,8 @@ EXPECTED_COLUMNS = [
 
 
 def main():
+    st.header("Welcome to the Dublin Retrofitting Tool")
+
     ## Load
     pre_retrofit_stock = fetch_bers()
     post_retrofit_stock = pre_retrofit_stock.copy()
@@ -47,6 +49,7 @@ def main():
     pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofit_stock)
 
     with st.form(key="Retrofit"):
+        st.markdown("> Click `Submit` once you've selected all parameters!")
         wall_retrofits = retrofit_fabric_component(
             pre_retrofit_stock,
             "wall",
@@ -93,6 +96,30 @@ def main():
     plot_ber_band_breakdown(
         pre_retrofit_energy_values=pre_retrofit_stock["energy_value"],
         post_retrofit_energy_values=post_retrofit_stock["energy_value"],
+    )
+    st.subheader("Costs")
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Lowest Likely Cost [M€]": [
+                    wall_retrofits["lower_bound_cost"],
+                    roof_retrofits["lower_bound_cost"],
+                    window_retrofits["lower_bound_cost"],
+                    wall_retrofits["lower_bound_cost"]
+                    + roof_retrofits["lower_bound_cost"]
+                    + window_retrofits["lower_bound_cost"],
+                ],
+                "Highest Likely Cost [M€]": [
+                    wall_retrofits["upper_bound_cost"],
+                    roof_retrofits["upper_bound_cost"],
+                    window_retrofits["upper_bound_cost"],
+                    wall_retrofits["upper_bound_cost"]
+                    + roof_retrofits["upper_bound_cost"]
+                    + window_retrofits["upper_bound_cost"],
+                ],
+            },
+            index=["Wall", "Roof", "Window", "Total"],
+        )
     )
 
 
@@ -216,10 +243,11 @@ def retrofit_fabric_component(
         floor_areas=floor_areas,
     )
 
+    to_millions = 1e-6
     return {
         "uvalues": new_uvalues,
-        "lower_costs": lower_costs,
-        "upper_costs": upper_costs,
+        "lower_bound_cost": lower_costs.sum() * to_millions,
+        "upper_bound_cost": upper_costs.sum() * to_millions,
     }
 
 
