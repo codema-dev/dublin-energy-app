@@ -46,30 +46,32 @@ def main():
     ## Calculate
     pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofit_stock)
 
-    wall_retrofits = retrofit_fabric_component(
-        pre_retrofit_stock,
-        "wall",
-        target_uvalue_default=0.2,
-        lower_cost_bound_default=50,
-        upper_cost_bound_default=300,
-        floor_areas=total_floor_area,
-    )
-    roof_retrofits = retrofit_fabric_component(
-        pre_retrofit_stock,
-        "roof",
-        target_uvalue_default=0.13,
-        lower_cost_bound_default=5,
-        upper_cost_bound_default=30,
-        floor_areas=total_floor_area,
-    )
-    window_retrofits = retrofit_fabric_component(
-        pre_retrofit_stock,
-        "window",
-        target_uvalue_default=0.2,
-        lower_cost_bound_default=30,
-        upper_cost_bound_default=150,
-        floor_areas=total_floor_area,
-    )
+    with st.form(key="Retrofit"):
+        wall_retrofits = retrofit_fabric_component(
+            pre_retrofit_stock,
+            "wall",
+            target_uvalue_default=0.2,
+            lower_cost_bound_default=50,
+            upper_cost_bound_default=300,
+            floor_areas=total_floor_area,
+        )
+        roof_retrofits = retrofit_fabric_component(
+            pre_retrofit_stock,
+            "roof",
+            target_uvalue_default=0.13,
+            lower_cost_bound_default=5,
+            upper_cost_bound_default=30,
+            floor_areas=total_floor_area,
+        )
+        window_retrofits = retrofit_fabric_component(
+            pre_retrofit_stock,
+            "window",
+            target_uvalue_default=0.2,
+            lower_cost_bound_default=30,
+            upper_cost_bound_default=150,
+            floor_areas=total_floor_area,
+        )
+        st.form_submit_button(label="Submit")
 
     post_retrofit_stock["wall_uvalue"] = wall_retrofits["uvalues"]
     post_retrofit_stock["roof_uvalue"] = roof_retrofits["uvalues"]
