@@ -1,6 +1,5 @@
 from pathlib import Path
-from typing import Dict
-from urllib.request import urlretrieve
+from typing import Dict, Union
 
 import altair as alt
 import numpy as np
@@ -123,16 +122,9 @@ def main():
     )
 
 
-def _fetch(url: str, filepath: Path):
-    if not filepath.exists():
-        urlretrieve(url=url, filename=filepath)
-
-
 @st.cache
 def fetch_bers():
-    filepath = Path("bers.csv")
-    _fetch(url="https://storage.googleapis.com/codema-dev/bers.csv", filepath=filepath)
-    bers = pd.read_csv(filepath)
+    bers = pd.read_csv("https://storage.googleapis.com/codema-dev/bers.csv")
     assert set(EXPECTED_COLUMNS).issubset(bers.columns)
     return bers
 
@@ -191,7 +183,7 @@ def retrofit_fabric_component(
     lower_cost_bound_default: float,
     upper_cost_bound_default: float,
     floor_areas: pd.Series,
-):
+) -> Dict[str, Union[pd.Series, int]]:
     st.subheader(component.capitalize())
 
     percentage_retrofitted = (
