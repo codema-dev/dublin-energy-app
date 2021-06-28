@@ -33,22 +33,27 @@ def main():
     st.header("Welcome to the Dublin Retrofitting Tool")
 
     ## Load
-    pre_retrofit_stock = fetch_bers()
-    post_retrofit_stock = pre_retrofit_stock.copy()
+    raw_building_stock = fetch_bers()
 
-    ## Globals
-    total_floor_area = (
-        pre_retrofit_stock["ground_floor_area"]
-        + pre_retrofit_stock["first_floor_area"]
-        + pre_retrofit_stock["second_floor_area"]
-        + pre_retrofit_stock["third_floor_area"]
-    )
+    with st.form(key="Inputs"):
 
-    ## Calculate
-    pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofit_stock)
-
-    with st.form(key="Retrofit"):
         st.markdown("> Click `Submit` once you've selected all parameters!")
+
+        ## Filter
+        pre_retrofit_stock = filter_by_ber_level(raw_building_stock)
+        post_retrofit_stock = pre_retrofit_stock.copy()
+
+        ## Globals
+        total_floor_area = (
+            pre_retrofit_stock["ground_floor_area"]
+            + pre_retrofit_stock["first_floor_area"]
+            + pre_retrofit_stock["second_floor_area"]
+            + pre_retrofit_stock["third_floor_area"]
+        )
+
+        ## Calculate
+        pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofit_stock)
+
         wall_retrofits = retrofit_fabric_component(
             pre_retrofit_stock,
             "wall",
@@ -132,6 +137,70 @@ def fetch_bers():
     bers = pd.read_csv("https://storage.googleapis.com/codema-dev/bers.csv")
     assert set(EXPECTED_COLUMNS).issubset(bers.columns)
     return bers
+
+
+def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
+    return pd.cut(
+        energy_values,
+        [
+            -np.inf,
+            25,
+            50,
+            75,
+            100,
+            125,
+            150,
+            175,
+            200,
+            225,
+            260,
+            300,
+            340,
+            380,
+            450,
+            np.inf,
+        ],
+        labels=[
+            "A1",
+            "A2",
+            "A3",
+            "B1",
+            "B2",
+            "B3",
+            "C1",
+            "C2",
+            "C3",
+            "D1",
+            "D2",
+            "E1",
+            "E2",
+            "F",
+            "G",
+        ],
+    )
+
+
+def filter_by_ber_level(building_stock: pd.DataFrame) -> pd.DataFrame:
+    building_stock_levels = _get_ber_rating(building_stock["energy_value"]).str[0]
+    ber_bands = ["A-B", "C-D", "E-G"]
+    options = ["All"] + ber_bands
+    selected_ber_rating = st.selectbox(
+        "Filter by BER Rating: ",
+        options,
+        index=1,
+    )
+    if selected_ber_rating == "All":
+        mask = pd.Series([True] * len(building_stock), dtype="bool")
+    elif selected_ber_rating in ber_bands:
+        if selected_ber_rating == "A-B":
+            mask = building_stock_levels.isin(["A", "B"])
+        elif selected_ber_rating == "C-D":
+            mask = building_stock_levels.isin(["C", "D"])
+        else:
+            mask = building_stock_levels.isin(["E", "F", "G"])
+    else:
+        raise ValueError(f"{selected_ber_rating} not in {options}")
+    return building_stock[mask].copy()
 
 
 def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
@@ -249,49 +318,7 @@ def retrofit_fabric_component(
 
 
 def _get_ber_rating_breakdown(energy_values: pd.Series):
-    return (
-        pd.cut(
-            energy_values,
-            [
-                -np.inf,
-                25,
-                50,
-                75,
-                100,
-                125,
-                150,
-                175,
-                200,
-                225,
-                260,
-                300,
-                340,
-                380,
-                450,
-                np.inf,
-            ],
-            labels=[
-                "A1",
-                "A2",
-                "A3",
-                "B1",
-                "B2",
-                "B3",
-                "C1",
-                "C2",
-                "C3",
-                "D1",
-                "D2",
-                "E1",
-                "E2",
-                "F",
-                "G",
-            ],
-        )
-        .astype(str)
-        .value_counts()
-        .sort_index()
-    )
+    return _get_ber_rating(energy_values).astype(str).value_counts().sort_index()
 
 
 def _get_ber_band_breakdown(energy_values):
