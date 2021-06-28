@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Dict
 from urllib.request import urlretrieve
 
+import altair as alt
 import numpy as np
 import pandas as pd
 from rc_building_model import fab
@@ -30,30 +31,77 @@ EXPECTED_COLUMNS = [
 
 
 def main():
-    pre_retrofitted_stock = fetch_bers()
-    retrofitted_stock = pre_retrofitted_stock.copy()
-    pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofitted_stock)
+    ## Load
+    pre_retrofit_stock = fetch_bers()
+    post_retrofit_stock = pre_retrofit_stock.copy()
+
+    ## Globals
+    total_floor_area = (
+        pre_retrofit_stock["ground_floor_area"]
+        + pre_retrofit_stock["first_floor_area"]
+        + pre_retrofit_stock["second_floor_area"]
+        + pre_retrofit_stock["third_floor_area"]
+    )
+
+    ## Calculate
+    pre_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(pre_retrofit_stock)
+
     wall_retrofits = retrofit_fabric_component(
-        pre_retrofitted_stock,
+        pre_retrofit_stock,
         "wall",
         target_uvalue_default=0.2,
         lower_cost_bound_default=50,
         upper_cost_bound_default=300,
+        floor_areas=total_floor_area,
     )
     roof_retrofits = retrofit_fabric_component(
-        pre_retrofitted_stock,
+        pre_retrofit_stock,
         "roof",
         target_uvalue_default=0.13,
         lower_cost_bound_default=5,
         upper_cost_bound_default=30,
+        floor_areas=total_floor_area,
     )
     window_retrofits = retrofit_fabric_component(
-        pre_retrofitted_stock,
+        pre_retrofit_stock,
         "window",
         target_uvalue_default=0.2,
         lower_cost_bound_default=30,
         upper_cost_bound_default=150,
+        floor_areas=total_floor_area,
     )
+
+    post_retrofit_stock["wall_uvalue"] = wall_retrofits["uvalues"]
+    post_retrofit_stock["roof_uvalue"] = roof_retrofits["uvalues"]
+    post_retrofit_stock["window_uvalue"] = window_retrofits["uvalues"]
+    post_retrofit_fabric_heat_loss = calculate_fabric_heat_loss(post_retrofit_stock)
+
+    energy_value_improvement = (
+        pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
+    ) / total_floor_area
+    post_retrofit_stock["energy_value"] = (
+        post_retrofit_stock["energy_value"] - energy_value_improvement
+    )
+
+    ## Plot
+    plot_ber_rating_breakdown(
+        pre_retrofit_energy_values=pre_retrofit_stock["energy_value"],
+        post_retrofit_energy_values=post_retrofit_stock["energy_value"],
+    )
+
+
+def _fetch(url: str, filepath: Path):
+    if not filepath.exists():
+        urlretrieve(url=url, filename=filepath)
+
+
+@st.cache
+def fetch_bers():
+    filepath = Path("bers.csv")
+    _fetch(url="https://storage.googleapis.com/codema-dev/bers.csv", filepath=filepath)
+    bers = pd.read_csv(filepath)
+    assert set(EXPECTED_COLUMNS).issubset(bers.columns)
+    return bers
 
 
 def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
@@ -73,7 +121,103 @@ def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
     return htuse.calculate_heat_loss_per_year(heat_loss_w_k)
 
 
-def assign_ber_ratings(energy_values: pd.Series):
+def _retrofit_fabric(
+    percentage_retrofitted: float,
+    sample_size: int,
+    new_uvalue: float,
+    original_uvalues: pd.Series,
+) -> pd.Series:
+    number_retrofitted = int(percentage_retrofitted * sample_size)
+    retrofitted_uvalues = pd.Series([new_uvalue] * number_retrofitted, dtype="float32")
+    unretrofitted_uvalues = original_uvalues.iloc[number_retrofitted:]
+    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues]).reset_index(
+        drop=True
+    )
+
+
+def _estimate_cost_of_fabric_retrofits(
+    percentage_retrofitted: float,
+    sample_size: int,
+    cost: float,
+    floor_areas: pd.Series,
+) -> pd.Series:
+    number_retrofitted = int(percentage_retrofitted * sample_size)
+    number_unretrofitted = sample_size - number_retrofitted
+    retrofit_cost = pd.Series([cost] * number_retrofitted, dtype="int64")
+    unretrofitted_cost = pd.Series([0] * number_unretrofitted, dtype="int64")
+    return (
+        pd.concat([retrofit_cost, unretrofitted_cost]).reset_index(drop=True)
+        * floor_areas
+    )
+
+
+def retrofit_fabric_component(
+    building_stock: pd.DataFrame,
+    component: str,
+    target_uvalue_default: float,
+    lower_cost_bound_default: float,
+    upper_cost_bound_default: float,
+    floor_areas: pd.Series,
+):
+    st.subheader(component.capitalize())
+
+    percentage_retrofitted = (
+        st.slider(
+            f"% of dwellings retrofitted to {target_uvalue_default} [kWh/m²year]",
+            min_value=0,
+            max_value=100,
+            value=0,
+            key=component,
+        )
+        / 100
+    )
+
+    c1, c2 = st.beta_columns(2)
+    lower_bound_cost = c1.number_input(
+        label="Lowest Likely Cost [€/m²]",
+        min_value=0,
+        value=lower_cost_bound_default,
+        key=component,
+        step=5,
+    )
+    upper_bound_cost = c2.number_input(
+        label="Highest Likely Cost [€/m²]",
+        min_value=0,
+        value=upper_cost_bound_default,
+        key=component,
+        step=5,
+    )
+
+    size_of_stock = len(building_stock)
+
+    new_uvalues = _retrofit_fabric(
+        percentage_retrofitted=percentage_retrofitted,
+        sample_size=size_of_stock,
+        new_uvalue=target_uvalue_default,
+        original_uvalues=building_stock[f"{component}_uvalue"],
+    )
+
+    lower_costs = _estimate_cost_of_fabric_retrofits(
+        percentage_retrofitted=percentage_retrofitted,
+        sample_size=size_of_stock,
+        cost=lower_bound_cost,
+        floor_areas=floor_areas,
+    )
+    upper_costs = _estimate_cost_of_fabric_retrofits(
+        percentage_retrofitted=percentage_retrofitted,
+        sample_size=size_of_stock,
+        cost=upper_bound_cost,
+        floor_areas=floor_areas,
+    )
+
+    return {
+        "uvalues": new_uvalues,
+        "lower_costs": lower_costs,
+        "upper_costs": upper_costs,
+    }
+
+
+def _group_into_ber_ratings(energy_values: pd.Series):
     return pd.cut(
         energy_values,
         [
@@ -114,133 +258,53 @@ def assign_ber_ratings(energy_values: pd.Series):
     )
 
 
-def assign_ber_bands(energy_ratings):
-    return energy_ratings.str[0].map(
-        {
-            "A": "A-B",
-            "B": "A-B",
-            "C": "C-D",
-            "D": "C-D",
-            "E": "E-G",
-            "F": "E-G",
-            "G": "E-G",
-        }
+def _group_into_ber_bands(energy_values):
+    return pd.cut(
+        energy_values,
+        [
+            -np.inf,
+            150,
+            300,
+            np.inf,
+        ],
+        labels=["A-B", "C-D", "E-G"],
     )
 
 
-def _fetch(url: str, filepath: Path):
-    if not filepath.exists():
-        urlretrieve(url=url, filename=filepath)
-
-
-@st.cache
-def fetch_bers():
-    filepath = Path("bers.csv")
-    _fetch(url="https://storage.googleapis.com/codema-dev/bers.csv", filepath=filepath)
-    bers = pd.read_csv(filepath)
-    assert set(EXPECTED_COLUMNS).issubset(bers.columns)
-    return bers
-
-
-def _retrofit_fabric(
-    percentage_retrofitted: float,
-    sample_size: int,
-    new_uvalue: float,
-    original_uvalues: pd.Series,
-) -> pd.Series:
-    number_retrofitted = int(percentage_retrofitted * sample_size)
-    retrofitted_uvalues = pd.Series([new_uvalue] * number_retrofitted)
-    unretrofitted_uvalues = original_uvalues.iloc[number_retrofitted:]
-    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues]).reset_index(
-        drop=True
-    )
-
-
-def _estimate_cost_of_fabric_retrofits(
-    percentage_retrofitted: float,
-    sample_size: int,
-    cost: float,
-    floor_areas: pd.Series,
-) -> pd.Series:
-    number_retrofitted = int(percentage_retrofitted * sample_size)
-    number_unretrofitted = sample_size - number_retrofitted
-    retrofit_cost = pd.Series([cost] * number_retrofitted)
-    unretrofitted_cost = pd.Series([0] * number_unretrofitted)
+def _get_ber_rating_breakdown(energy_values: pd.Series) -> pd.Series:
     return (
-        pd.concat([retrofit_cost, unretrofitted_cost]).reset_index(drop=True)
-        * floor_areas
+        _group_into_ber_ratings(energy_values).astype(str).value_counts().sort_index()
     )
 
 
-def retrofit_fabric_component(
-    building_stock: pd.DataFrame,
-    component: str,
-    target_uvalue_default: float,
-    lower_cost_bound_default: float,
-    upper_cost_bound_default: float,
+def plot_ber_rating_breakdown(
+    pre_retrofit_energy_values: pd.DataFrame, post_retrofit_energy_values: pd.Series
 ):
-    st.subheader(component.capitalize())
-
-    percentage_retrofitted = (
-        st.slider(
-            f"% of dwellings retrofitted to {target_uvalue_default} [kWh/m²year]",
-            min_value=0,
-            max_value=100,
-            value=0,
-            key=component,
+    st.subheader("BER Ratings")
+    pre_retrofit_ber_ratings = _get_ber_rating_breakdown(pre_retrofit_energy_values)
+    post_retrofit_ber_ratings = _get_ber_rating_breakdown(post_retrofit_energy_values)
+    ber_ratings = (
+        pd.concat(
+            [
+                pre_retrofit_ber_ratings.to_frame().assign(category="Pre"),
+                post_retrofit_ber_ratings.to_frame().assign(category="Post"),
+            ]
         )
-        / 100
+        .reset_index()
+        .rename(columns={"index": "ber_rating", "energy_value": "total"})
     )
-
-    c1, c2 = st.beta_columns(2)
-    lower_bound_cost = c1.number_input(
-        label="Lowest Likely Cost [€/m²]",
-        min_value=0,
-        value=lower_cost_bound_default,
-        key=component,
-        step=5,
+    chart = (
+        alt.Chart(ber_ratings)
+        .mark_bar()
+        .encode(
+            alt.X("category:N", axis=alt.Axis(title=None)),
+            alt.Y("total:Q"),
+            alt.Column("ber_rating:O"),
+            color=alt.Color("category"),
+        )
+        .properties(width=20)  # width of one column facet
     )
-    upper_bound_cost = c2.number_input(
-        label="Highest Likely Cost [€/m²]",
-        min_value=0,
-        value=upper_cost_bound_default,
-        key=component,
-        step=5,
-    )
-
-    size_of_stock = len(building_stock)
-    total_floor_area = (
-        building_stock["ground_floor_area"]
-        + building_stock["first_floor_area"]
-        + building_stock["second_floor_area"]
-        + building_stock["third_floor_area"]
-    )
-
-    new_uvalues = _retrofit_fabric(
-        percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
-        new_uvalue=target_uvalue_default,
-        original_uvalues=building_stock[f"{component}_uvalue"],
-    )
-
-    lower_costs = _estimate_cost_of_fabric_retrofits(
-        percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
-        cost=lower_bound_cost,
-        floor_areas=total_floor_area,
-    )
-    upper_costs = _estimate_cost_of_fabric_retrofits(
-        percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
-        cost=upper_bound_cost,
-        floor_areas=total_floor_area,
-    )
-
-    return {
-        "uvalues": new_uvalues,
-        "lower_costs": lower_costs,
-        "upper_costs": upper_costs,
-    }
+    st.altair_chart(chart)
 
 
 if __name__ == "__main__":
