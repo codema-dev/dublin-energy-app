@@ -217,63 +217,67 @@ def retrofit_fabric_component(
     }
 
 
-def _group_into_ber_ratings(energy_values: pd.Series):
-    return pd.cut(
-        energy_values,
-        [
-            -np.inf,
-            25,
-            50,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            225,
-            260,
-            300,
-            340,
-            380,
-            450,
-            np.inf,
-        ],
-        labels=[
-            "A1",
-            "A2",
-            "A3",
-            "B1",
-            "B2",
-            "B3",
-            "C1",
-            "C2",
-            "C3",
-            "D1",
-            "D2",
-            "E1",
-            "E2",
-            "F",
-            "G",
-        ],
-    )
-
-
-def _group_into_ber_bands(energy_values):
-    return pd.cut(
-        energy_values,
-        [
-            -np.inf,
-            150,
-            300,
-            np.inf,
-        ],
-        labels=["A-B", "C-D", "E-G"],
-    )
-
-
-def _get_ber_rating_breakdown(energy_values: pd.Series) -> pd.Series:
+def _get_ber_rating_breakdown(energy_values: pd.Series):
     return (
-        _group_into_ber_ratings(energy_values).astype(str).value_counts().sort_index()
+        pd.cut(
+            energy_values,
+            [
+                -np.inf,
+                25,
+                50,
+                75,
+                100,
+                125,
+                150,
+                175,
+                200,
+                225,
+                260,
+                300,
+                340,
+                380,
+                450,
+                np.inf,
+            ],
+            labels=[
+                "A1",
+                "A2",
+                "A3",
+                "B1",
+                "B2",
+                "B3",
+                "C1",
+                "C2",
+                "C3",
+                "D1",
+                "D2",
+                "E1",
+                "E2",
+                "F",
+                "G",
+            ],
+        )
+        .astype(str)
+        .value_counts()
+        .sort_index()
+    )
+
+
+def _get_ber_band_breakdown(energy_values):
+    return (
+        pd.cut(
+            energy_values,
+            [
+                -np.inf,
+                150,
+                300,
+                np.inf,
+            ],
+            labels=["A-B", "C-D", "E-G"],
+        )
+        .astype(str)
+        .value_counts()
+        .sort_index()
     )
 
 
