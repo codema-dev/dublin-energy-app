@@ -97,6 +97,11 @@ def main():
         post_retrofit_energy_values=post_retrofit_stock["energy_value"],
     )
     st.subheader("Costs")
+    st.markdown(
+        "> **Caveat:** The default values for the upper|lower cost estimates are derived"
+        " from the [`TABULA`](https://energyaction.ie/projects/tabula.php) project which"
+        " ran from 2009 - 2012."
+    )
     st.dataframe(
         pd.DataFrame(
             {
@@ -188,7 +193,7 @@ def retrofit_fabric_component(
 
     percentage_retrofitted = (
         st.slider(
-            f"% of dwellings retrofitted to {target_uvalue_default} [kWh/m²year]",
+            f"% of dwellings retrofitted to {target_uvalue_default} [W/m²K]",
             min_value=0,
             max_value=100,
             value=0,
