@@ -186,7 +186,7 @@ def filter_by_ber_level(building_stock: pd.DataFrame) -> pd.DataFrame:
     options = ["All"] + ber_bands
     selected_ber_rating = st.selectbox(
         "Filter by BER Rating: ",
-        options,,
+        options,
     )
     if selected_ber_rating == "All":
         mask = pd.Series([True] * len(building_stock), dtype="bool")
