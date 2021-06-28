@@ -88,6 +88,10 @@ def main():
         pre_retrofit_energy_values=pre_retrofit_stock["energy_value"],
         post_retrofit_energy_values=post_retrofit_stock["energy_value"],
     )
+    plot_ber_band_breakdown(
+        pre_retrofit_energy_values=pre_retrofit_stock["energy_value"],
+        post_retrofit_energy_values=post_retrofit_stock["energy_value"],
+    )
 
 
 def _fetch(url: str, filepath: Path):
@@ -306,7 +310,37 @@ def plot_ber_rating_breakdown(
             alt.Column("ber_rating:O"),
             color=alt.Color("category"),
         )
-        .properties(width=20)  # width of one column facet
+        .properties(width=15)  # width of one column facet
+    )
+    st.altair_chart(chart)
+
+
+def plot_ber_band_breakdown(
+    pre_retrofit_energy_values: pd.DataFrame, post_retrofit_energy_values: pd.Series
+):
+    st.subheader("BER Bands")
+    pre_retrofit_ber_ratings = _get_ber_band_breakdown(pre_retrofit_energy_values)
+    post_retrofit_ber_ratings = _get_ber_band_breakdown(post_retrofit_energy_values)
+    ber_ratings = (
+        pd.concat(
+            [
+                pre_retrofit_ber_ratings.to_frame().assign(category="Pre"),
+                post_retrofit_ber_ratings.to_frame().assign(category="Post"),
+            ]
+        )
+        .reset_index()
+        .rename(columns={"index": "ber_band", "energy_value": "total"})
+    )
+    chart = (
+        alt.Chart(ber_ratings)
+        .mark_bar()
+        .encode(
+            alt.X("category:N", axis=alt.Axis(title=None)),
+            alt.Y("total:Q"),
+            alt.Column("ber_band:O"),
+            color=alt.Color("category"),
+        )
+        .properties(width=125)  # width of one column facet
     )
     st.altair_chart(chart)
 
