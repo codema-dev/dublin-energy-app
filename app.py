@@ -58,6 +58,7 @@ def main():
             pre_retrofit_stock,
             "wall",
             target_uvalue_default=0.2,
+            threshold_uvalue_default=0.5,
             lower_cost_bound_default=50,
             upper_cost_bound_default=300,
             floor_areas=total_floor_area,
@@ -66,6 +67,7 @@ def main():
             pre_retrofit_stock,
             "roof",
             target_uvalue_default=0.13,
+            threshold_uvalue_default=0.5,
             lower_cost_bound_default=5,
             upper_cost_bound_default=30,
             floor_areas=total_floor_area,
@@ -74,6 +76,7 @@ def main():
             pre_retrofit_stock,
             "window",
             target_uvalue_default=0.2,
+            threshold_uvalue_default=0.5,
             lower_cost_bound_default=30,
             upper_cost_bound_default=150,
             floor_areas=total_floor_area,
@@ -219,40 +222,42 @@ def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
     return htuse.calculate_heat_loss_per_year(heat_loss_w_k)
 
 
-def _retrofit_fabric(
-    percentage_retrofitted: float,
-    sample_size: int,
-    new_uvalue: float,
+def _select_buildings_to_retrofit(
     original_uvalues: pd.Series,
-) -> pd.Series:
-    number_retrofitted = int(percentage_retrofitted * sample_size)
-    retrofitted_uvalues = pd.Series([new_uvalue] * number_retrofitted, dtype="float32")
-    unretrofitted_uvalues = original_uvalues.iloc[number_retrofitted:]
-    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues]).reset_index(
-        drop=True
+    percentage_retrofitted: float,
+    threshold_uvalue: float,
+    random_state: int = 42,
+) -> np.array:
+    where_uvalue_is_over_threshold = original_uvalues > threshold_uvalue
+    to_retrofit = original_uvalues[where_uvalue_is_over_threshold].sample(
+        frac=percentage_retrofitted, random_state=random_state
     )
+    return original_uvalues.index.isin(to_retrofit.index)
+
+
+def _retrofit_fabric(
+    original_uvalues: pd.Series,
+    to_retrofit: pd.Series,
+    new_uvalue: float,
+) -> pd.Series:
+    retrofitted_uvalues = original_uvalues.copy()
+    retrofitted_uvalues.loc[to_retrofit] = new_uvalue
+    return retrofitted_uvalues
 
 
 def _estimate_cost_of_fabric_retrofits(
-    percentage_retrofitted: float,
-    sample_size: int,
+    to_retrofit: pd.Series,
     cost: float,
     floor_areas: pd.Series,
 ) -> pd.Series:
-    number_retrofitted = int(percentage_retrofitted * sample_size)
-    number_unretrofitted = sample_size - number_retrofitted
-    retrofit_cost = pd.Series([cost] * number_retrofitted, dtype="int64")
-    unretrofitted_cost = pd.Series([0] * number_unretrofitted, dtype="int64")
-    return (
-        pd.concat([retrofit_cost, unretrofitted_cost]).reset_index(drop=True)
-        * floor_areas
-    )
+    return pd.Series([cost] * to_retrofit, dtype="int64") * floor_areas
 
 
 def retrofit_fabric_component(
     building_stock: pd.DataFrame,
     component: str,
     target_uvalue_default: float,
+    threshold_uvalue_default: float,
     lower_cost_bound_default: float,
     upper_cost_bound_default: float,
     floor_areas: pd.Series,
@@ -261,7 +266,7 @@ def retrofit_fabric_component(
 
     percentage_retrofitted = (
         st.slider(
-            f"% of dwellings retrofitted to {target_uvalue_default} [W/m²K]",
+            f"% of viable dwellings retrofitted to U-Value = {target_uvalue_default} [W/m²K]",
             min_value=0,
             max_value=100,
             value=0,
@@ -269,41 +274,47 @@ def retrofit_fabric_component(
         )
         / 100
     )
+    with st.beta_expander(label="Change Default Costs & Threshold Values"):
+        threshold_uvalue = st.number_input(
+            label="Threshold U-Value [W/m²K] - assume no retrofits below this value",
+            min_value=float(0),
+            value=threshold_uvalue_default,
+            key=component,
+            step=0.05,
+        )
+        c1, c2 = st.beta_columns(2)
+        lower_bound_cost = c1.number_input(
+            label="Lowest Likely Cost [€/m²]",
+            min_value=0,
+            value=lower_cost_bound_default,
+            key=component,
+            step=5,
+        )
+        upper_bound_cost = c2.number_input(
+            label="Highest Likely Cost [€/m²]",
+            min_value=0,
+            value=upper_cost_bound_default,
+            key=component,
+            step=5,
+        )
 
-    c1, c2 = st.beta_columns(2)
-    lower_bound_cost = c1.number_input(
-        label="Lowest Likely Cost [€/m²]",
-        min_value=0,
-        value=lower_cost_bound_default,
-        key=component,
-        step=5,
-    )
-    upper_bound_cost = c2.number_input(
-        label="Highest Likely Cost [€/m²]",
-        min_value=0,
-        value=upper_cost_bound_default,
-        key=component,
-        step=5,
-    )
-
-    size_of_stock = len(building_stock)
-
-    new_uvalues = _retrofit_fabric(
-        percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
-        new_uvalue=target_uvalue_default,
+    buildings_to_retrofit = _select_buildings_to_retrofit(
         original_uvalues=building_stock[f"{component}_uvalue"],
-    )
-
-    lower_costs = _estimate_cost_of_fabric_retrofits(
         percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
+        threshold_uvalue=threshold_uvalue,
+    )
+    new_uvalues = _retrofit_fabric(
+        original_uvalues=building_stock[f"{component}_uvalue"],
+        to_retrofit=buildings_to_retrofit,
+        new_uvalue=target_uvalue_default,
+    )
+    lower_costs = _estimate_cost_of_fabric_retrofits(
+        to_retrofit=buildings_to_retrofit,
         cost=lower_bound_cost,
         floor_areas=floor_areas,
     )
     upper_costs = _estimate_cost_of_fabric_retrofits(
-        percentage_retrofitted=percentage_retrofitted,
-        sample_size=size_of_stock,
+        to_retrofit=buildings_to_retrofit,
         cost=upper_bound_cost,
         floor_areas=floor_areas,
     )
