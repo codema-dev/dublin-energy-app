@@ -61,7 +61,7 @@ def main():
             threshold_uvalue_default=0.5,
             lower_cost_bound_default=50,
             upper_cost_bound_default=300,
-            floor_areas=total_floor_area,
+            typical_area=70,
         )
         roof_retrofits = retrofit_fabric_component(
             pre_retrofit_stock,
@@ -70,7 +70,7 @@ def main():
             threshold_uvalue_default=0.5,
             lower_cost_bound_default=5,
             upper_cost_bound_default=30,
-            floor_areas=total_floor_area,
+            typical_area=50,
         )
         window_retrofits = retrofit_fabric_component(
             pre_retrofit_stock,
@@ -79,7 +79,7 @@ def main():
             threshold_uvalue_default=0.5,
             lower_cost_bound_default=30,
             upper_cost_bound_default=150,
-            floor_areas=total_floor_area,
+            typical_area=16,
         )
         st.form_submit_button(label="Submit")
 
@@ -248,9 +248,9 @@ def _retrofit_fabric(
 def _estimate_cost_of_fabric_retrofits(
     to_retrofit: pd.Series,
     cost: float,
-    floor_areas: pd.Series,
+    areas: pd.Series,
 ) -> pd.Series:
-    return pd.Series([cost] * to_retrofit, dtype="int64") * floor_areas
+    return pd.Series([cost] * to_retrofit, dtype="int64") * areas
 
 
 def retrofit_fabric_component(
@@ -260,7 +260,7 @@ def retrofit_fabric_component(
     threshold_uvalue_default: float,
     lower_cost_bound_default: float,
     upper_cost_bound_default: float,
-    floor_areas: pd.Series,
+    typical_area: int,
 ) -> Dict[str, Union[pd.Series, int]]:
     st.subheader(component.capitalize())
 
@@ -284,19 +284,26 @@ def retrofit_fabric_component(
         )
         c1, c2 = st.beta_columns(2)
         lower_bound_cost = c1.number_input(
-            label="Lowest Likely Cost [€/m²]",
+            label="Lowest* Likely Cost [€/m²]",
             min_value=0,
             value=lower_cost_bound_default,
             key=component,
             step=5,
         )
         upper_bound_cost = c2.number_input(
-            label="Highest Likely Cost [€/m²]",
+            label="Highest** Likely Cost [€/m²]",
             min_value=0,
             value=upper_cost_bound_default,
             key=component,
             step=5,
         )
+        footnote = (
+            f"<small> * {typical_area * lower_bound_cost}€ for a typical {component}"
+            f" area of {typical_area}m²<br>"
+            f"** {typical_area * upper_bound_cost}€ for a typical {component} area of"
+            f" {typical_area}m²</small>"
+        )
+        st.markdown(footnote, unsafe_allow_html=True)
 
     buildings_to_retrofit = _select_buildings_to_retrofit(
         original_uvalues=building_stock[f"{component}_uvalue"],
@@ -311,12 +318,12 @@ def retrofit_fabric_component(
     lower_costs = _estimate_cost_of_fabric_retrofits(
         to_retrofit=buildings_to_retrofit,
         cost=lower_bound_cost,
-        floor_areas=floor_areas,
+        areas=building_stock[f"{component}_area"],
     )
     upper_costs = _estimate_cost_of_fabric_retrofits(
         to_retrofit=buildings_to_retrofit,
         cost=upper_bound_cost,
-        floor_areas=floor_areas,
+        areas=building_stock[f"{component}_area"],
     )
 
     to_millions = 1e-6

@@ -74,9 +74,9 @@ def test_retrofit_fabric():
 def test_estimate_cost_of_fabric_retrofits():
     to_retrofit = pd.Series([False, True, False, False], dtype="bool")
     cost = 100
-    floor_areas = pd.Series([100] * 4, dtype="int64")
+    wall_areas = pd.Series([100] * 4, dtype="int64")
     expected_output = pd.Series([0, 10000, 0, 0])
     output = app._estimate_cost_of_fabric_retrofits(
-        to_retrofit=to_retrofit, cost=cost, floor_areas=floor_areas
+        to_retrofit=to_retrofit, cost=cost, areas=wall_areas
     )
     assert_series_equal(output, expected_output)
