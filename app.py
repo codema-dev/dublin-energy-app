@@ -11,6 +11,8 @@ import streamlit as st
 data_dir = Path("data")
 
 EXPECTED_COLUMNS = [
+    "small_area",
+    "year_of_construction",
     "energy_value",
     "roof_area",
     "roof_uvalue",
@@ -40,7 +42,11 @@ def main():
         st.markdown("> Click `Submit` once you've selected all parameters!")
 
         ## Filter
-        pre_retrofit_stock = filter_by_ber_level(raw_building_stock)
+        stock_by_ber_rating = filter_by_ber_level(raw_building_stock)
+        stock_by_small_area = filter_by_small_area(stock_by_ber_rating)
+
+        ## Initialise
+        pre_retrofit_stock = stock_by_small_area.copy()
         post_retrofit_stock = pre_retrofit_stock.copy()
 
         ## Globals
@@ -376,9 +382,9 @@ def plot_ber_rating_breakdown(
         alt.Chart(ber_ratings)
         .mark_bar()
         .encode(
-            alt.X("category:N", axis=alt.Axis(title=None)),
-            alt.Y("total:Q"),
-            alt.Column("ber_rating:O"),
+            x=alt.X("category:N", axis=alt.Axis(title=None, labels=False, ticks=False)),
+            y=alt.Y("total:Q"),
+            column=alt.Column("ber_rating:O"),
             color=alt.Color("category"),
         )
         .properties(width=15)  # width of one column facet
@@ -406,9 +412,9 @@ def plot_ber_band_breakdown(
         alt.Chart(ber_ratings)
         .mark_bar()
         .encode(
-            alt.X("category:N", axis=alt.Axis(title=None)),
-            alt.Y("total:Q"),
-            alt.Column("ber_band:O"),
+            x=alt.X("category:N", axis=alt.Axis(title=None, labels=False, ticks=False)),
+            y=alt.Y("total:Q"),
+            column=alt.Column("ber_band:O"),
             color=alt.Color("category"),
         )
         .properties(width=125)  # width of one column facet
