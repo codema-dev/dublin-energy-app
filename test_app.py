@@ -1,4 +1,5 @@
-from numpy import exp
+import numpy as np
+from numpy.testing import assert_array_almost_equal
 import pandas as pd
 from pandas.testing import assert_frame_equal
 import pytest
@@ -23,3 +24,34 @@ def test_filter_by_ber_level(selected_ber, expected_output, monkeypatch):
     building_stock = pd.DataFrame({"energy_value": [50, 200, 600]})
     output = app.filter_by_ber_level(building_stock)
     assert_frame_equal(output, expected_output)
+
+
+def test_select_buildings_to_retrofit():
+    original_uvalues = pd.Series([0.13, 2.3] * 6, dtype="float16")
+    percentage_retrofitted = 0.5
+    threshold_uvalue = 0.5
+    random_state = 42
+    expected_output = np.array(
+        [
+            False,
+            True,
+            False,
+            True,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            True,
+        ],
+        dtype="bool",
+    )
+    output = app._select_buildings_to_retrofit(
+        original_uvalues=original_uvalues,
+        percentage_retrofitted=percentage_retrofitted,
+        threshold_uvalue=threshold_uvalue,
+        random_state=random_state,
+    )
+    assert_array_almost_equal(output, expected_output)

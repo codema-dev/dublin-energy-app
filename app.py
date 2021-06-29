@@ -219,6 +219,19 @@ def calculate_fabric_heat_loss(building_stock: pd.DataFrame) -> pd.Series:
     return htuse.calculate_heat_loss_per_year(heat_loss_w_k)
 
 
+def _select_buildings_to_retrofit(
+    original_uvalues: pd.Series,
+    percentage_retrofitted: float,
+    threshold_uvalue: float,
+    random_state: int = 42,
+) -> np.array:
+    where_uvalue_is_over_threshold = original_uvalues > threshold_uvalue
+    to_retrofit = original_uvalues[where_uvalue_is_over_threshold].sample(
+        frac=percentage_retrofitted, random_state=random_state
+    )
+    return original_uvalues.index.isin(to_retrofit.index)
+
+
 def _retrofit_fabric(
     percentage_retrofitted: float,
     sample_size: int,
