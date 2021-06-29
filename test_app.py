@@ -2,6 +2,7 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 import pandas as pd
 from pandas.testing import assert_frame_equal
+from pandas.testing import assert_series_equal
 import pytest
 
 import app
@@ -55,3 +56,16 @@ def test_select_buildings_to_retrofit():
         random_state=random_state,
     )
     assert_array_almost_equal(output, expected_output)
+
+
+def test_retrofit_fabric():
+    original_uvalues = pd.Series([0.13, 2.3, 0.13, 2.3], dtype="float64")
+    to_retrofit = pd.Series([False, True, False, False], dtype="bool")
+    new_uvalue = 0.13
+    expected_output = pd.Series([0.13, 0.13, 0.13, 2.3])
+    output = app._retrofit_fabric(
+        original_uvalues=original_uvalues,
+        to_retrofit=to_retrofit,
+        new_uvalue=new_uvalue,
+    )
+    assert_series_equal(output, expected_output)

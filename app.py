@@ -233,17 +233,13 @@ def _select_buildings_to_retrofit(
 
 
 def _retrofit_fabric(
-    percentage_retrofitted: float,
-    sample_size: int,
-    new_uvalue: float,
     original_uvalues: pd.Series,
+    to_retrofit: pd.Series,
+    new_uvalue: float,
 ) -> pd.Series:
-    number_retrofitted = int(percentage_retrofitted * sample_size)
-    retrofitted_uvalues = pd.Series([new_uvalue] * number_retrofitted, dtype="float32")
-    unretrofitted_uvalues = original_uvalues.iloc[number_retrofitted:]
-    return pd.concat([retrofitted_uvalues, unretrofitted_uvalues]).reset_index(
-        drop=True
-    )
+    retrofitted_uvalues = original_uvalues.copy()
+    retrofitted_uvalues.loc[to_retrofit] = new_uvalue
+    return retrofitted_uvalues
 
 
 def _estimate_cost_of_fabric_retrofits(
