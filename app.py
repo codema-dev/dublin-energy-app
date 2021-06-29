@@ -266,7 +266,7 @@ def retrofit_fabric_component(
 
     percentage_retrofitted = (
         st.slider(
-            f"% of dwellings retrofitted to U-Value = {target_uvalue_default} [W/m²K]",
+            f"% of viable dwellings retrofitted to U-Value = {target_uvalue_default} [W/m²K]",
             min_value=0,
             max_value=100,
             value=0,
