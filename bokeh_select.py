@@ -70,7 +70,7 @@ def _plot_points(plot: Plot, points: pd.DataFrame) -> Figure:
             """,
         ),
     )
-    plot.circle("x", "y", fill_alpha=1, size=5, source=cds_lasso)
+    plot.circle("x", "y", fill_alpha=1, size=1.5, source=cds_lasso)
     return plot
 
 
