@@ -30,7 +30,11 @@ def _convert_geometry_to_xy(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 @st.cache
 def _convert_to_geojson_str(gdf: gpd.GeoDataFrame) -> str:
-    return json.dumps(json.loads(small_area_boundaries.to_crs(epsg="3857").to_json()))
+    tolerance_m = 50
+    boundaries = small_area_boundaries.to_crs(epsg="3857").geometry.simplify(
+        tolerance_m
+    )
+    return json.dumps(json.loads(boundaries.to_json()))
 
 
 def _plot_basemap(boundaries: str):
