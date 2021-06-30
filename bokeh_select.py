@@ -4,6 +4,7 @@ from bokeh.models.plots import Plot
 from bokeh.plotting import figure
 from bokeh.plotting import Figure
 from bokeh.models import ColumnDataSource, CustomJS
+from bokeh.tile_providers import CARTODBPOSITRON, get_provider
 
 import geopandas as gpd
 import pandas as pd
@@ -35,11 +36,13 @@ def _plot_small_area_points(small_area_points) -> Figure:
         width=500,
         height=500,
     )
+    tile_provider = get_provider(CARTODBPOSITRON)
+    plot.add_tile(tile_provider)
     plot.circle("x", "y", fill_alpha=0.5, size=5, source=cds_lasso)
     return plot
 
 
-def _ask_user_for_small_areas(
+def _get_small_areas_on_selection(
     bokeh_plot: Plot, small_area_points: gpd.GeoDataFrame
 ) -> pd.Series:
     lasso_selected = streamlit_bokeh_events(
@@ -67,7 +70,7 @@ def select_small_areas(small_area_boundaries: gpd.GeoDataFrame) -> List[str]:
     bokeh_plot = _plot_small_area_points(small_area_points)
     st.subheader("Select Dwellings by Small Area")
     st.markdown("> Click on the `Lasso Select` tool on the toolbar below!")
-    small_areas_selected = _ask_user_for_small_areas(
+    small_areas_selected = _get_small_areas_on_selection(
         bokeh_plot=bokeh_plot, small_area_points=small_area_points
     )
     with st.beta_expander("Show Selected Small Areas"):
