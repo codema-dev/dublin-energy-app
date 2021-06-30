@@ -22,6 +22,11 @@ def load_small_area_boundaries() -> gpd.GeoDataFrame:
 
 
 @st.cache
+def load_building_stock() -> pd.DataFrame:
+    return pd.read_csv("data/dublin_small_area_bers/dublin_bers.csv")
+
+
+@st.cache
 def _convert_geometry_to_xy(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return gdf.assign(
         x=lambda gdf: gdf.geometry.centroid.x, y=lambda gdf: gdf.geometry.centroid.y
@@ -101,11 +106,26 @@ def select_small_areas_on_map(boundaries, points) -> List[str]:
     small_areas_selected = _get_points_on_selection(bokeh_plot=pointmap, points=points)
     with st.beta_expander("Show Selected Small Areas"):
         st.write("Small Areas: " + str(small_areas_selected.to_list()))
-    return small_areas_selected
+    return small_areas_selected.to_list()
+
+
+def filter_by_small_area(
+    small_area_points: pd.DataFrame,
+    small_area_boundaires_geojson: str,
+    building_stock: pd.DataFrame,
+):
+    small_areas_selected = select_small_areas_on_map(
+        small_area_boundaires_geojson, small_area_points
+    )
+    return building_stock.query("small_area == @small_areas_selected")
 
 
 if __name__ == "__main__":
     small_area_boundaries = load_small_area_boundaries()
     small_area_points = _convert_geometry_to_xy(small_area_boundaries)
     small_area_boundaries_geojson = _convert_to_geojson_str(small_area_boundaries)
-    select_small_areas_on_map(small_area_boundaries_geojson, small_area_points)
+    building_stock = load_building_stock()
+    filtered_building_stock = filter_by_small_area(
+        small_area_points, small_area_boundaries_geojson, building_stock
+    )
+    st.write(filtered_building_stock.head(10))
