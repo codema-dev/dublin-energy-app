@@ -9,7 +9,8 @@ pandas >= 1.3
 geopandas
 
 # filesystem
-ffspec[s3]
+ffspec
+s3fs
 python-dotenv
 # ... for use of pd.read_* storage_options
 
