@@ -1,8 +1,17 @@
-ffspec
-s3fs
+# ui
+bokeh==2.2.3
 streamlit >= 0.83
 # ... for use of st.form
+streamlit-bokeh-events 
+
+# dataframes
 pandas >= 1.3
-# ... for use of pd.read_* storage_options
+geopandas
+
+# filesystem
+ffspec[s3]
 python-dotenv
+# ... for use of pd.read_* storage_options
+
+# model
 git+git://github.com/codema-dev/rc-building-model
