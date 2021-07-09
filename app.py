@@ -20,7 +20,13 @@ def main(data_dir: Path = _DATA_DIR, config: ConfigParser = CONFIG):
 
     with st.form(key="Inputs"):
         st.markdown(" ℹ️ Click `Submit` once you've selected all parameters")
-        small_areas_selected = mapselect(
+        selections = {}
+        selections["ber_ratings"] = st.multiselect(
+            "Select BER Ratings",
+            options=["A", "B", "C", "D", "E", "F", "G"],
+            default=["A", "B", "C", "D", "E", "F", "G"],
+        )
+        selections["small_areas"] = mapselect(
             column_name="small_area", boundaries=small_area_boundaries
         )
         inputs_are_submitted = st.form_submit_button(label="Submit")
