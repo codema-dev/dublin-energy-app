@@ -8,7 +8,8 @@
             "lower": 50,
             "upper": 300
         },
-        "typical_area": 70
+        "typical_area": 70,
+        "percentage_selected": 0
     },
     "roof": {
         "uvalue":{
@@ -19,7 +20,8 @@
             "lower": 5,
             "upper": 30
         },
-        "typical_area": 50
+        "typical_area": 50,
+        "percentage_selected": 0
     },
     "window": {
         "uvalue":{
@@ -30,6 +32,7 @@
             "lower": 30,
             "upper": 150
         },
-        "typical_area": 16
+        "typical_area": 16,
+        "percentage_selected": 0
     }
 }

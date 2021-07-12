@@ -2,9 +2,9 @@ from configparser import ConfigParser
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import Union
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -15,7 +15,7 @@ from dea import CONFIG
 from dea import DEFAULTS
 from dea import _DATA_DIR
 
-DeaSelection = Dict[str, Dict[str, Union[int, Dict[str, int]]]]
+DeaSelection = Dict[str, Any]
 
 
 def main(
@@ -63,8 +63,8 @@ def main(
 
 def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
     selections = defaults.copy()
-    with st.beta_expander(label="Change Default Costs & Threshold Values"):
-        for component, properties in defaults.items():
+    for component, properties in defaults.items():
+        with st.beta_expander(label=f"Change {component} defaults"):
             selections[component]["uvalue"]["target"] = st.number_input(
                 label="Threshold U-Value [W/m²K] - assume no retrofits below this value",
                 min_value=float(0),
@@ -94,6 +94,15 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
                 for a typical {component} area of {properties["typical_area"]}m²</small>
                 """
             st.markdown(footnote, unsafe_allow_html=True)
+
+        selections[component]["percentage_selected"] = st.slider(
+            f"""% of viable {component}s retrofitted to U-Value =
+            {selections[component]['uvalue']['target']} [W/m²K]""",
+            min_value=0,
+            max_value=100,
+            value=0,
+            key=component,
+        )
 
     return selections
 
