@@ -1,0 +1,35 @@
+{
+    "wall": {
+        "uvalue":{
+            "target": 0.2,
+            "threshold": 0.5
+        },
+        "cost": {
+            "lower": 50,
+            "upper": 300
+        },
+        "typical_area": 70
+    },
+    "roof": {
+        "uvalue":{
+            "target": 0.13,
+            "threshold": 0.5
+        },
+        "cost": {
+            "lower": 5,
+            "upper": 30
+        },
+        "typical_area": 50
+    },
+    "window": {
+        "uvalue":{
+            "target": 0.2,
+            "threshold": 0.5
+        },
+        "cost": {
+            "lower": 30,
+            "upper": 150
+        },
+        "typical_area": 16
+    }
+}
