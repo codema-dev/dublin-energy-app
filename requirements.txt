@@ -1,8 +1,8 @@
 bokeh==2.2.3
+icontract
 streamlit>=0.83
 streamlit-bokeh-events
 pandas
 geopandas
 fsspec[s3]
-python-dotenv
 rcbm
