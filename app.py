@@ -5,6 +5,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 
+import altair as alt
 import geopandas as gpd
 import icontract
 import numpy as np
@@ -73,6 +74,13 @@ def main(
             post_retrofit_bers = _calculate_ber_improvement(
                 pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
             )
+            pre_vs_post_retrofit_bers = combine_pre_and_post_bers(
+                pre_retrofit_bers=filtered_buildings["energy_rating"],
+                post_retrofit_bers=post_retrofit_bers,
+            )
+
+        with st.spinner("Plotting BER improvement..."):
+            _plot_ber_rating_comparison(pre_vs_post_retrofit_bers)
 
 
 def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
@@ -83,7 +91,7 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
                 label="Threshold U-Value [W/m²K] - assume no retrofits below this value",
                 min_value=float(0),
                 value=properties["uvalue"]["target"],
-                key=component,
+                key=component + "_threshold",
                 step=0.05,
             )
             c1, c2 = st.beta_columns(2)
@@ -91,14 +99,14 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
                 label="Lowest* Likely Cost [€/m²]",
                 min_value=0,
                 value=properties["cost"]["lower"],
-                key=component,
+                key=component + "_cost_lower",
                 step=5,
             )
             selections[component]["cost"]["upper"] = c2.number_input(
                 label="Highest** Likely Cost [€/m²]",
                 min_value=0,
                 value=properties["cost"]["upper"],
-                key=component,
+                key=component + "_cost_upper",
                 step=5,
             )
             footnote = f"""
@@ -115,7 +123,7 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
             min_value=0.0,
             max_value=1.0,
             value=0.0,
-            key=component,
+            key=component + "_percentage",
         )
 
     return selections
@@ -251,7 +259,7 @@ def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
             "F",
             "G",
         ],
-    )
+    ).rename("energy_rating")
 
 
 def _calculate_ber_improvement(
@@ -269,6 +277,51 @@ def _calculate_ber_improvement(
         pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
     ) / total_floor_area
     return _get_ber_rating(pre_retrofit["energy_value"] - energy_value_improvement)
+
+
+@icontract.ensure(
+    lambda result: np.array_equal(
+        result.columns, ["energy_rating", "category", "total"]
+    )
+)
+def combine_pre_and_post_bers(
+    pre_retrofit_bers: pd.Series, post_retrofit_bers: pd.Series
+) -> pd.DataFrame:
+    return (
+        pd.concat(
+            [
+                pre_retrofit_bers.to_frame().assign(category="Pre"),
+                post_retrofit_bers.to_frame().assign(category="Post"),
+            ]
+        )
+        .groupby(["energy_rating", "category"])
+        .size()
+        .rename("total")
+        .reset_index()
+    )
+
+
+@icontract.ensure(
+    lambda pre_vs_post_retrofit_bers: np.array_equal(
+        pre_vs_post_retrofit_bers.columns, ["energy_rating", "category", "total"]
+    )
+)
+def _plot_ber_rating_comparison(pre_vs_post_retrofit_bers: pd.DataFrame) -> None:
+    chart = (
+        alt.Chart(pre_vs_post_retrofit_bers)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "category",
+                axis=alt.Axis(title=None, labels=False, ticks=False),
+            ),
+            y=alt.Y("total", title="Number of Dwellings"),
+            column=alt.Column("energy_rating", title="BER Ratings"),
+            color=alt.Color("category"),
+        )
+        .properties(width=15)  # width of one column facet
+    )
+    st.altair_chart(chart)
 
 
 if __name__ == "__main__":
