@@ -53,16 +53,8 @@ def main(
         buildings = _load_buildings(config["urls"]["bers"], data_dir=data_dir)
 
         with st.spinner("Getting selected buildings..."):
-            filtered_buildings = buildings.pipe(
-                filter.filter_by_substrings,
-                column_name="energy_rating",
-                selected_substrings=selections["energy_rating"],
-                all_substrings=["A", "B", "C", "D", "E", "F", "G"],
-            ).pipe(
-                filter.filter_by_substrings,
-                column_name="small_area",
-                selected_substrings=selections["small_area"],
-                all_substrings=small_area_boundaries["small_area"],
+            filtered_buildings = _filter_buildings(
+                buildings=buildings, selections=selections
             )
 
         with st.spinner("Retrofitting buildings..."):
@@ -71,12 +63,8 @@ def main(
             )
 
         with st.spinner("Calculating BER improvement..."):
-            post_retrofit_bers = _calculate_ber_improvement(
+            pre_vs_post_retrofit_bers = _calculate_ber_improvement(
                 pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
-            )
-            pre_vs_post_retrofit_bers = combine_pre_and_post_bers(
-                pre_retrofit_bers=filtered_buildings["energy_rating"],
-                post_retrofit_bers=post_retrofit_bers,
             )
 
         with st.spinner("Plotting BER improvement..."):
@@ -141,7 +129,28 @@ def _load_buildings(url: str, data_dir: Path):
     # Remove NS or Not stated buildings until ibsg can replace them with SA modes
     return io.load(
         read=pd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
-    ).query("period_built != 'NS'")
+    ).assign(energy_rating=lambda df: _get_ber_rating(df["energy_value"]))
+
+
+@st.cache
+def _filter_buildings(
+    buildings: pd.DataFrame, selections: Dict[str, Any]
+) -> pd.DataFrame:
+    return (
+        buildings.pipe(
+            filter.filter_by_substrings,
+            column_name="energy_rating",
+            selected_substrings=selections["energy_rating"],
+            all_substrings=["A", "B", "C", "D", "E", "F", "G"],
+        )
+        .pipe(
+            filter.filter_by_substrings,
+            column_name="small_area",
+            selected_substrings=selections["small_area"],
+            all_substrings=buildings["small_area"],
+        )
+        .reset_index(drop=True)
+    )
 
 
 def _get_viable_buildings(
@@ -222,44 +231,70 @@ def _calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
 
 
 def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
-    return pd.cut(
-        energy_values,
-        [
-            -np.inf,
-            25,
-            50,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            225,
-            260,
-            300,
-            340,
-            380,
-            450,
-            np.inf,
-        ],
-        labels=[
-            "A1",
-            "A2",
-            "A3",
-            "B1",
-            "B2",
-            "B3",
-            "C1",
-            "C2",
-            "C3",
-            "D1",
-            "D2",
-            "E1",
-            "E2",
-            "F",
-            "G",
-        ],
-    ).rename("energy_rating")
+    return (
+        pd.cut(
+            energy_values,
+            [
+                -np.inf,
+                25,
+                50,
+                75,
+                100,
+                125,
+                150,
+                175,
+                200,
+                225,
+                260,
+                300,
+                340,
+                380,
+                450,
+                np.inf,
+            ],
+            labels=[
+                "A1",
+                "A2",
+                "A3",
+                "B1",
+                "B2",
+                "B3",
+                "C1",
+                "C2",
+                "C3",
+                "D1",
+                "D2",
+                "E1",
+                "E2",
+                "F",
+                "G",
+            ],
+        )
+        .rename("energy_rating")
+        .astype("string")
+    )  # streamlit & altair don't recognise category
+
+
+@icontract.ensure(
+    lambda result: np.array_equal(
+        result.columns, ["energy_rating", "category", "total"]
+    )
+)
+def _combine_pre_and_post_bers(
+    pre_retrofit_bers: pd.Series, post_retrofit_bers: pd.Series
+) -> pd.DataFrame:
+    return (
+        pd.concat(
+            [
+                pre_retrofit_bers.to_frame().assign(category="Pre"),
+                post_retrofit_bers.to_frame().assign(category="Post"),
+            ]
+        )
+        .groupby(["energy_rating", "category"])
+        .size()
+        .rename("total")
+        .reset_index()
+    )
 
 
 def _calculate_ber_improvement(
@@ -276,28 +311,12 @@ def _calculate_ber_improvement(
     energy_value_improvement = (
         pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
     ) / total_floor_area
-    return _get_ber_rating(pre_retrofit["energy_value"] - energy_value_improvement)
-
-
-@icontract.ensure(
-    lambda result: np.array_equal(
-        result.columns, ["energy_rating", "category", "total"]
+    post_retrofit_bers = _get_ber_rating(
+        pre_retrofit["energy_value"] - energy_value_improvement.fillna(0)
     )
-)
-def combine_pre_and_post_bers(
-    pre_retrofit_bers: pd.Series, post_retrofit_bers: pd.Series
-) -> pd.DataFrame:
-    return (
-        pd.concat(
-            [
-                pre_retrofit_bers.to_frame().assign(category="Pre"),
-                post_retrofit_bers.to_frame().assign(category="Post"),
-            ]
-        )
-        .groupby(["energy_rating", "category"])
-        .size()
-        .rename("total")
-        .reset_index()
+    return _combine_pre_and_post_bers(
+        pre_retrofit_bers=pre_retrofit["energy_rating"],
+        post_retrofit_bers=post_retrofit_bers,
     )
 
 
