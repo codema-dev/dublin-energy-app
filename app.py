@@ -13,6 +13,7 @@ import pandas as pd
 from rcbm import fab
 from rcbm import htuse
 import streamlit as st
+from streamlit.state.session_state import Value
 
 from dea import filter
 from dea import io
@@ -136,7 +137,7 @@ def _load_buildings(url: str, data_dir: Path):
 def _filter_buildings(
     buildings: pd.DataFrame, selections: Dict[str, Any]
 ) -> pd.DataFrame:
-    return (
+    filtered_buildings = (
         buildings.pipe(
             filter.filter_by_substrings,
             column_name="energy_rating",
@@ -151,6 +152,18 @@ def _filter_buildings(
         )
         .reset_index(drop=True)
     )
+    if filtered_buildings.empty:
+        raise ValueError(
+            f"""
+            There are no buildings meeting your criteria:
+
+            energy_rating: {selections["energy_rating"]}
+
+            small_area: {selections["small_area"]}
+            """
+        )
+    else:
+        return filtered_buildings
 
 
 def _get_viable_buildings(

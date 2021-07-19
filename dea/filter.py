@@ -5,13 +5,6 @@ import pandas as pd
 import streamlit as st
 
 
-@icontract.ensure(lambda result: len(result) > 0)
-@icontract.require(
-    lambda df, column_name: ~df[column_name].isnull().any(),
-    error=lambda column_name, selected_substrings: icontract.ViolationError(
-        f"Cannot filter {column_name} on {selected_substrings} as it contains NA / NaN values"
-    ),
-)
 def filter_by_substrings(
     df: pd.DataFrame,
     column_name: str,
