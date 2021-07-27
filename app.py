@@ -55,11 +55,17 @@ def main(
             )
 
         with st.spinner("Calculating BER improvement..."):
-            pre_vs_post_retrofit_bers = retrofit.calculate_ber_improvement(
+            pre_vs_post_bers = retrofit.calculate_ber_improvement(
                 pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
             )
 
-        plot.plot_ber_rating_comparison(pre_vs_post_retrofit_bers)
+        with st.spinner("Calculating Heat Pump Viability improvement..."):
+            pre_vs_post_hps = retrofit.calculate_heat_pump_viability_improvement(
+                pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
+            )
+
+        plot.plot_ber_rating_comparison(pre_vs_post_bers)
+        plot.plot_heat_pump_viability_comparison(pre_vs_post_hps)
         plot.plot_retrofit_costs(post_retrofit=retrofitted_buildings)
 
 

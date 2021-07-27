@@ -22,6 +22,7 @@ def _filter_by_substrings(
     return selected_df
 
 
+@st.cache
 def get_selected_buildings(
     buildings: pd.DataFrame, selections: Dict[str, Any]
 ) -> pd.DataFrame:

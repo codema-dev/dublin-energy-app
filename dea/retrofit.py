@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from rcbm import fab
 from rcbm import htuse
+from rcbm import vent
 
 
 def _get_viable_buildings(
@@ -70,7 +71,7 @@ def retrofit_buildings(
 
 
 def _calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
-    heat_loss_w_k = fab.calculate_fabric_heat_loss(
+    return fab.calculate_fabric_heat_loss(
         roof_area=buildings["roof_area"],
         roof_uvalue=buildings["roof_uvalue"],
         wall_area=buildings["wall_area"],
@@ -83,7 +84,11 @@ def _calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
         door_uvalue=buildings["door_uvalue"],
         thermal_bridging_factor=0.05,
     )
-    return htuse.calculate_heat_loss_per_year(heat_loss_w_k)
+
+
+def _calculate_annual_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
+    heat_loss = _calculate_fabric_heat_loss(buildings)
+    return htuse.calculate_heat_loss_per_year(heat_loss)
 
 
 def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
@@ -132,21 +137,19 @@ def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
 
 
 @icontract.ensure(
-    lambda result: np.array_equal(
-        result.columns, ["energy_rating", "category", "total"]
-    )
+    lambda result, column: np.array_equal(result.columns, [column, "category", "total"])
 )
-def _combine_pre_and_post_bers(
-    pre_retrofit_bers: pd.Series, post_retrofit_bers: pd.Series
+def _get_size_of_pre_vs_post_category(
+    pre_retrofit_category: pd.Series, post_retrofit_category: pd.Series, column: str
 ) -> pd.DataFrame:
     return (
         pd.concat(
             [
-                pre_retrofit_bers.to_frame().assign(category="Pre"),
-                post_retrofit_bers.to_frame().assign(category="Post"),
+                pre_retrofit_category.to_frame().assign(category="Pre"),
+                post_retrofit_category.to_frame().assign(category="Post"),
             ]
         )
-        .groupby(["energy_rating", "category"])
+        .groupby([column, "category"])
         .size()
         .rename("total")
         .reset_index()
@@ -162,16 +165,63 @@ def calculate_ber_improvement(
         + pre_retrofit["second_floor_area"]
         + pre_retrofit["third_floor_area"]
     )
-    pre_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(pre_retrofit)
-    post_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(post_retrofit)
+    pre_retrofit_annual_fabric_heat_loss = _calculate_annual_fabric_heat_loss(
+        pre_retrofit
+    )
+    post_retrofit_annual_fabric_heat_loss = _calculate_annual_fabric_heat_loss(
+        post_retrofit
+    )
     energy_value_improvement = (
-        pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
+        pre_retrofit_annual_fabric_heat_loss - post_retrofit_annual_fabric_heat_loss
     ) / total_floor_area
     pre_retrofit_bers = _get_ber_rating(pre_retrofit["energy_value"])
     post_retrofit_bers = _get_ber_rating(
         pre_retrofit["energy_value"] - energy_value_improvement.fillna(0)
     )
-    return _combine_pre_and_post_bers(
-        pre_retrofit_bers=pre_retrofit_bers,
-        post_retrofit_bers=post_retrofit_bers,
+    return _get_size_of_pre_vs_post_category(
+        pre_retrofit_category=pre_retrofit_bers,
+        post_retrofit_category=post_retrofit_bers,
+        column="energy_rating",
+    )
+
+
+def _bin_viable_for_heat_pumps(heat_loss_parameter):
+    return (
+        pd.cut(
+            heat_loss_parameter,
+            bins=[-np.inf, 2.3, np.inf],
+            labels=[True, False],
+        )
+        .astype(bool)
+        .rename("is_viable_for_a_heat_pump")
+    )
+
+
+def calculate_heat_pump_viability_improvement(
+    pre_retrofit: pd.DataFrame, post_retrofit: pd.DataFrame
+) -> pd.Series:
+    total_floor_area = (
+        pre_retrofit["ground_floor_area"]
+        + pre_retrofit["first_floor_area"]
+        + pre_retrofit["second_floor_area"]
+        + pre_retrofit["third_floor_area"]
+    )
+    pre_retrofit_viability = _bin_viable_for_heat_pumps(
+        pre_retrofit["heat_loss_parameter"]
+    )
+    pre_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(pre_retrofit)
+    post_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(post_retrofit)
+    heat_loss_improvement = (
+        pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
+    )
+    post_retrofit_heat_loss_parameter = (
+        pre_retrofit["heat_loss_parameter"] - heat_loss_improvement / total_floor_area
+    )
+    post_retrofit_viability = _bin_viable_for_heat_pumps(
+        post_retrofit_heat_loss_parameter
+    )
+    return _get_size_of_pre_vs_post_category(
+        pre_retrofit_category=pre_retrofit_viability,
+        post_retrofit_category=post_retrofit_viability,
+        column="is_viable_for_a_heat_pump",
     )
