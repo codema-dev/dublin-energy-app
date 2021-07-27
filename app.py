@@ -3,10 +3,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 
-import altair as alt
 import geopandas as gpd
-import icontract
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -15,6 +12,7 @@ from dea import DEFAULTS
 from dea import _DATA_DIR
 from dea import filter
 from dea import io
+from dea import plot
 from dea.mapselect import mapselect
 from dea import retrofit
 
@@ -64,8 +62,8 @@ def main(
                 pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
             )
 
-        _plot_ber_rating_comparison(pre_vs_post_retrofit_bers)
-        _plot_retrofit_costs(post_retrofit=retrofitted_buildings)
+        plot.plot_ber_rating_comparison(pre_vs_post_retrofit_bers)
+        plot.plot_retrofit_costs(post_retrofit=retrofitted_buildings)
 
 
 def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
@@ -126,42 +124,6 @@ def _load_buildings(url: str, data_dir: Path):
     return io.load(
         read=pd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
     )
-
-
-@icontract.ensure(
-    lambda pre_vs_post_retrofit_bers: np.array_equal(
-        pre_vs_post_retrofit_bers.columns, ["energy_rating", "category", "total"]
-    )
-)
-def _plot_ber_rating_comparison(pre_vs_post_retrofit_bers: pd.DataFrame) -> None:
-    chart = (
-        alt.Chart(pre_vs_post_retrofit_bers)
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "category",
-                axis=alt.Axis(title=None, labels=False, ticks=False),
-            ),
-            y=alt.Y("total", title="Number of Dwellings"),
-            column=alt.Column("energy_rating", title="BER Ratings"),
-            color=alt.Color("category"),
-        )
-        .properties(width=15)  # width of one column facet
-    )
-    st.altair_chart(chart)
-
-
-def _plot_retrofit_costs(post_retrofit: pd.DataFrame) -> None:
-    cost_columns = [c for c in post_retrofit.columns if "cost" in c]
-    costs = (
-        post_retrofit[cost_columns]
-        .sum()
-        .divide(1e6)
-        .round(2)
-        .rename("M€")
-        .reset_index()
-    )
-    st.write(costs)
 
 
 if __name__ == "__main__":
