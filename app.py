@@ -1,4 +1,4 @@
-cfrom configparser import ConfigParser
+from configparser import ConfigParser
 from pathlib import Path
 from typing import Any
 from typing import Dict
@@ -50,7 +50,7 @@ def main(
         buildings = _load_buildings(config["urls"]["bers"], data_dir=data_dir)
 
         with st.spinner("Getting selected buildings..."):
-            filtered_buildings = _filter_buildings(
+            filtered_buildings = filter.get_selected_buildings(
                 buildings=buildings, selections=selections
             )
 
@@ -126,39 +126,6 @@ def _load_buildings(url: str, data_dir: Path):
     return io.load(
         read=pd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
     )
-
-
-@st.cache
-def _filter_buildings(
-    buildings: pd.DataFrame, selections: Dict[str, Any]
-) -> pd.DataFrame:
-    filtered_buildings = (
-        buildings.pipe(
-            filter.filter_by_substrings,
-            column_name="energy_rating",
-            selected_substrings=selections["energy_rating"],
-            all_substrings=["A", "B", "C", "D", "E", "F", "G"],
-        )
-        .pipe(
-            filter.filter_by_substrings,
-            column_name="small_area",
-            selected_substrings=selections["small_area"],
-            all_substrings=buildings["small_area"],
-        )
-        .reset_index(drop=True)
-    )
-    if filtered_buildings.empty:
-        raise ValueError(
-            f"""
-            There are no buildings meeting your criteria:
-
-            energy_rating: {selections["energy_rating"]}
-
-            small_area: {selections["small_area"]}
-            """
-        )
-    else:
-        return filtered_buildings
 
 
 @icontract.ensure(
