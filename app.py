@@ -3,8 +3,6 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 
-import geopandas as gpd
-import pandas as pd
 import streamlit as st
 
 from dea import CONFIG
@@ -26,9 +24,10 @@ def main(
 ):
     st.header("Welcome to the Dublin Retrofitting Tool")
 
-    small_area_boundaries = _load_small_area_boundaries(
+    small_area_boundaries = io.load_small_area_boundaries(
         url=config["urls"]["small_area_boundaries"], data_dir=data_dir
     )
+    buildings = io.load_buildings(url=config["urls"]["bers"], data_dir=data_dir)
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
@@ -45,8 +44,6 @@ def main(
         inputs_are_submitted = st.form_submit_button(label="Submit")
 
     if inputs_are_submitted:
-        buildings = _load_buildings(config["urls"]["bers"], data_dir=data_dir)
-
         with st.spinner("Getting selected buildings..."):
             filtered_buildings = filter.get_selected_buildings(
                 buildings=buildings, selections=selections
@@ -110,20 +107,6 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
         )
 
     return selections
-
-
-@st.cache
-def _load_small_area_boundaries(url: str, data_dir: Path) -> gpd.GeoDataFrame:
-    return io.load(
-        read=gpd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
-    )
-
-
-@st.cache
-def _load_buildings(url: str, data_dir: Path):
-    return io.load(
-        read=pd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
-    )
 
 
 if __name__ == "__main__":
