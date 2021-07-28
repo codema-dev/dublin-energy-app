@@ -43,28 +43,28 @@ def main(
         inputs_are_submitted = st.form_submit_button(label="Submit")
 
     if inputs_are_submitted:
-        buildings = io.load_buildings(
-            url=config["urls"]["bers"], data_dir=data_dir
-        ).pipe(filter.get_selected_buildings, selections=selections)
+        pre_retrofit = io.load_selected_buildings(
+            url=config["urls"]["bers"], data_dir=data_dir, selections=selections
+        )
 
         with st.spinner("Retrofitting buildings..."):
-            retrofitted_buildings = retrofit.retrofit_buildings(
-                buildings=buildings, selections=selections
+            post_retrofit = retrofit.retrofit_buildings(
+                buildings=pre_retrofit, selections=selections
             )
 
         with st.spinner("Calculating BER improvement..."):
             pre_vs_post_bers = retrofit.calculate_ber_improvement(
-                pre_retrofit=buildings, post_retrofit=retrofitted_buildings
+                pre_retrofit=pre_retrofit, post_retrofit=post_retrofit
             )
 
         with st.spinner("Calculating Heat Pump Viability improvement..."):
             pre_vs_post_hps = retrofit.calculate_heat_pump_viability_improvement(
-                pre_retrofit=buildings, post_retrofit=retrofitted_buildings
+                pre_retrofit=pre_retrofit, post_retrofit=post_retrofit
             )
 
         plot.plot_ber_rating_comparison(pre_vs_post_bers)
         plot.plot_heat_pump_viability_comparison(pre_vs_post_hps)
-        plot.plot_retrofit_costs(post_retrofit=retrofitted_buildings)
+        plot.plot_retrofit_costs(post_retrofit=post_retrofit)
 
 
 def _retrofitselect(defaults: DeaSelection) -> DeaSelection:

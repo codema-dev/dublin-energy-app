@@ -3,7 +3,6 @@ from typing import Dict
 from typing import List
 
 import pandas as pd
-import streamlit as st
 
 
 def _filter_by_substrings(
@@ -22,7 +21,6 @@ def _filter_by_substrings(
     return selected_df
 
 
-@st.cache
 def get_selected_buildings(
     buildings: pd.DataFrame, selections: Dict[str, Any]
 ) -> pd.DataFrame:
