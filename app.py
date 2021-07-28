@@ -27,7 +27,6 @@ def main(
     small_area_boundaries = io.load_small_area_boundaries(
         url=config["urls"]["small_area_boundaries"], data_dir=data_dir
     )
-    buildings = io.load_buildings(url=config["urls"]["bers"], data_dir=data_dir)
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
@@ -44,24 +43,23 @@ def main(
         inputs_are_submitted = st.form_submit_button(label="Submit")
 
     if inputs_are_submitted:
-        with st.spinner("Getting selected buildings..."):
-            filtered_buildings = filter.get_selected_buildings(
-                buildings=buildings, selections=selections
-            )
+        buildings = io.load_buildings(
+            url=config["urls"]["bers"], data_dir=data_dir
+        ).pipe(filter.get_selected_buildings, selections=selections)
 
         with st.spinner("Retrofitting buildings..."):
             retrofitted_buildings = retrofit.retrofit_buildings(
-                buildings=filtered_buildings, selections=selections
+                buildings=buildings, selections=selections
             )
 
         with st.spinner("Calculating BER improvement..."):
             pre_vs_post_bers = retrofit.calculate_ber_improvement(
-                pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
+                pre_retrofit=buildings, post_retrofit=retrofitted_buildings
             )
 
         with st.spinner("Calculating Heat Pump Viability improvement..."):
             pre_vs_post_hps = retrofit.calculate_heat_pump_viability_improvement(
-                pre_retrofit=filtered_buildings, post_retrofit=retrofitted_buildings
+                pre_retrofit=buildings, post_retrofit=retrofitted_buildings
             )
 
         plot.plot_ber_rating_comparison(pre_vs_post_bers)
