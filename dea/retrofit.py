@@ -14,7 +14,7 @@ def _get_viable_buildings(
     uvalues: pd.DataFrame,
     threshold_uvalue: float,
     percentage_selected: float,
-    random_seed: float,
+    random_seed: int = 42,
 ) -> pd.Series:
     where_uvalue_is_over_threshold = uvalues > threshold_uvalue
     subset_over_threshold = uvalues[where_uvalue_is_over_threshold].sample(
@@ -27,48 +27,35 @@ def _estimate_cost_of_fabric_retrofits(
     is_selected: pd.Series,
     cost: float,
     areas: pd.Series,
-    name: str,
 ) -> pd.Series:
-    return pd.Series([cost] * is_selected * areas, dtype="int64", name=name)
+    return pd.Series([cost] * is_selected * areas, dtype="int64")
 
 
 def retrofit_buildings(
-    buildings: pd.DataFrame, selections: Dict[str, Any], random_seed: float = 42
+    buildings: pd.DataFrame,
+    selections: Dict[str, Any],
 ) -> pd.DataFrame:
-    retofitted_properties: List[pd.Series] = []
-    all_columns_but_uvalues: List[str] = list(buildings.columns)
+    post_retrofit = buildings.copy()
     for component, properties in selections.items():
-        column_name = component + "_uvalue"
-        uvalues = buildings[column_name].copy()
         where_is_viable_building = _get_viable_buildings(
-            uvalues=uvalues,
+            uvalues=buildings[component + "_uvalue"],
             threshold_uvalue=properties["uvalue"]["threshold"],
             percentage_selected=properties["percentage_selected"],
-            random_seed=random_seed,
         )
-        uvalues.loc[where_is_viable_building] = properties["uvalue"]["target"]
-        retrofitted_uvalues = uvalues
-        areas = buildings[component + "_area"]
-        cost_lower = _estimate_cost_of_fabric_retrofits(
+        post_retrofit.loc[where_is_viable_building, component + "_uvalue"] = properties[
+            "uvalue"
+        ]["target"]
+        post_retrofit[component + "_cost_lower"] = _estimate_cost_of_fabric_retrofits(
             is_selected=where_is_viable_building,
             cost=properties["cost"]["lower"],
-            areas=areas,
-            name=component + "_cost_lower",
+            areas=buildings[component + "_area"],
         )
-        cost_upper = _estimate_cost_of_fabric_retrofits(
+        post_retrofit[component + "_cost_upper"] = _estimate_cost_of_fabric_retrofits(
             is_selected=where_is_viable_building,
             cost=properties["cost"]["upper"],
-            areas=areas,
-            name=component + "_cost_upper",
+            areas=buildings[component + "_area"],
         )
-        all_columns_but_uvalues.remove(column_name)
-        retofitted_properties += [retrofitted_uvalues, cost_lower, cost_upper]
-    retrofits = pd.concat(retofitted_properties, axis="columns")
-    all_buildings = pd.concat(
-        [buildings[all_columns_but_uvalues], retrofits],
-        axis="columns",
-    )
-    return calculate_fabric_heat_loss(all_buildings)
+    return calculate_fabric_heat_loss(post_retrofit)
 
 
 def calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
