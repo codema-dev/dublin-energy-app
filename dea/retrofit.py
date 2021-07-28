@@ -37,7 +37,7 @@ def retrofit_buildings(
 ) -> pd.DataFrame:
     retofitted_properties: List[pd.Series] = []
     all_columns_but_uvalues: List[str] = list(buildings.columns)
-    for component, properties in selections["retrofit"].items():
+    for component, properties in selections.items():
         column_name = component + "_uvalue"
         uvalues = buildings[column_name].copy()
         where_is_viable_building = _get_viable_buildings(
@@ -64,14 +64,15 @@ def retrofit_buildings(
         all_columns_but_uvalues.remove(column_name)
         retofitted_properties += [retrofitted_uvalues, cost_lower, cost_upper]
     retrofits = pd.concat(retofitted_properties, axis="columns")
-    return pd.concat(
+    all_buildings = pd.concat(
         [buildings[all_columns_but_uvalues], retrofits],
         axis="columns",
     )
+    return calculate_fabric_heat_loss(all_buildings)
 
 
-def _calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
-    return fab.calculate_fabric_heat_loss(
+def calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
+    buildings["fabric_heat_loss_w_per_k"] = fab.calculate_fabric_heat_loss(
         roof_area=buildings["roof_area"],
         roof_uvalue=buildings["roof_uvalue"],
         wall_area=buildings["wall_area"],
@@ -84,11 +85,10 @@ def _calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
         door_uvalue=buildings["door_uvalue"],
         thermal_bridging_factor=0.05,
     )
-
-
-def _calculate_annual_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
-    heat_loss = _calculate_fabric_heat_loss(buildings)
-    return htuse.calculate_heat_loss_per_year(heat_loss)
+    buildings["fabric_heat_loss_kwh_per_y"] = htuse.calculate_heat_loss_per_year(
+        buildings["fabric_heat_loss_w_per_k"]
+    )
+    return buildings
 
 
 def _get_ber_rating(energy_values: pd.Series) -> pd.Series:
@@ -159,21 +159,10 @@ def _get_size_of_pre_vs_post_category(
 def calculate_ber_improvement(
     pre_retrofit: pd.DataFrame, post_retrofit: pd.DataFrame
 ) -> pd.Series:
-    total_floor_area = (
-        pre_retrofit["ground_floor_area"]
-        + pre_retrofit["first_floor_area"]
-        + pre_retrofit["second_floor_area"]
-        + pre_retrofit["third_floor_area"]
-    )
-    pre_retrofit_annual_fabric_heat_loss = _calculate_annual_fabric_heat_loss(
-        pre_retrofit
-    )
-    post_retrofit_annual_fabric_heat_loss = _calculate_annual_fabric_heat_loss(
-        post_retrofit
-    )
     energy_value_improvement = (
-        pre_retrofit_annual_fabric_heat_loss - post_retrofit_annual_fabric_heat_loss
-    ) / total_floor_area
+        pre_retrofit["fabric_heat_loss_kwh_per_y"]
+        - post_retrofit["fabric_heat_loss_kwh_per_y"]
+    ) / pre_retrofit["total_floor_area"]
     pre_retrofit_bers = _get_ber_rating(pre_retrofit["energy_value"])
     post_retrofit_bers = _get_ber_rating(
         pre_retrofit["energy_value"] - energy_value_improvement.fillna(0)
@@ -200,22 +189,16 @@ def _bin_viable_for_heat_pumps(heat_loss_parameter):
 def calculate_heat_pump_viability_improvement(
     pre_retrofit: pd.DataFrame, post_retrofit: pd.DataFrame
 ) -> pd.Series:
-    total_floor_area = (
-        pre_retrofit["ground_floor_area"]
-        + pre_retrofit["first_floor_area"]
-        + pre_retrofit["second_floor_area"]
-        + pre_retrofit["third_floor_area"]
-    )
     pre_retrofit_viability = _bin_viable_for_heat_pumps(
         pre_retrofit["heat_loss_parameter"]
     )
-    pre_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(pre_retrofit)
-    post_retrofit_fabric_heat_loss = _calculate_fabric_heat_loss(post_retrofit)
     heat_loss_improvement = (
-        pre_retrofit_fabric_heat_loss - post_retrofit_fabric_heat_loss
+        pre_retrofit["fabric_heat_loss_w_per_k"]
+        - post_retrofit["fabric_heat_loss_w_per_k"]
     )
     post_retrofit_heat_loss_parameter = (
-        pre_retrofit["heat_loss_parameter"] - heat_loss_improvement / total_floor_area
+        pre_retrofit["heat_loss_parameter"]
+        - heat_loss_improvement / pre_retrofit["total_floor_area"]
     )
     post_retrofit_viability = _bin_viable_for_heat_pumps(
         post_retrofit_heat_loss_parameter

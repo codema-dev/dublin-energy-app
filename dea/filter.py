@@ -22,19 +22,21 @@ def _filter_by_substrings(
 
 
 def get_selected_buildings(
-    buildings: pd.DataFrame, selections: Dict[str, Any]
+    buildings: pd.DataFrame,
+    selected_energy_ratings: List[str],
+    selected_small_areas: List[str],
 ) -> pd.DataFrame:
     filtered_buildings = (
         buildings.pipe(
             _filter_by_substrings,
             column_name="energy_rating",
-            selected_substrings=selections["energy_rating"],
+            selected_substrings=selected_energy_ratings,
             all_substrings=["A", "B", "C", "D", "E", "F", "G"],
         )
         .pipe(
             _filter_by_substrings,
             column_name="small_area",
-            selected_substrings=selections["small_area"],
+            selected_substrings=selected_small_areas,
             all_substrings=buildings["small_area"],
         )
         .reset_index(drop=True)

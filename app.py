@@ -30,26 +30,28 @@ def main(
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
-        selections = {}
-        selections["energy_rating"] = st.multiselect(
+        selected_energy_ratings = st.multiselect(
             "Select BER Ratings",
             options=["A", "B", "C", "D", "E", "F", "G"],
             default=["A", "B", "C", "D", "E", "F", "G"],
         )
-        selections["small_area"] = mapselect(
+        selected_small_areas = mapselect(
             column_name="small_area", boundaries=small_area_boundaries
         )
-        selections["retrofit"] = _retrofitselect(defaults)
+        retrofit_selections = _retrofitselect(defaults)
         inputs_are_submitted = st.form_submit_button(label="Submit")
 
     if inputs_are_submitted:
         pre_retrofit = io.load_selected_buildings(
-            url=config["urls"]["bers"], data_dir=data_dir, selections=selections
+            url=config["urls"]["bers"],
+            data_dir=data_dir,
+            selected_energy_ratings=selected_energy_ratings,
+            selected_small_areas=selected_small_areas,
         )
 
         with st.spinner("Retrofitting buildings..."):
             post_retrofit = retrofit.retrofit_buildings(
-                buildings=pre_retrofit, selections=selections
+                buildings=pre_retrofit, selections=retrofit_selections
             )
 
         with st.spinner("Calculating BER improvement..."):
