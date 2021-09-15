@@ -1,6 +1,6 @@
-bokeh==2.2.3
+bokeh
 icontract
-streamlit>=0.83
+streamlit
 streamlit-bokeh-events
 pandas
 geopandas
