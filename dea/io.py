@@ -11,13 +11,13 @@ from dea import filter
 from dea import retrofit
 
 
-def _load(read: Callable, url: str, data_dir: Path, filesystem_name: str):
+def _load(read: Callable, url: str, data_dir: Path, filesystem_name: str, **kwargs):
     filename = url.split("/")[-1]
     filepath = data_dir / filename
     if not filepath.exists():
         fs = fsspec.filesystem(filesystem_name)
         with fs.open(url, cache_storage=filepath) as f:
-            df = read(f)
+            df = read(f, **kwargs)
     else:
         df = read(filepath)
     return df
@@ -26,7 +26,7 @@ def _load(read: Callable, url: str, data_dir: Path, filesystem_name: str):
 @st.cache
 def load_small_area_boundaries(url: str, data_dir: Path) -> gpd.GeoDataFrame:
     return _load(
-        read=gpd.read_parquet, url=url, data_dir=data_dir, filesystem_name="s3"
+        read=gpd.read_file, url=url, data_dir=data_dir, filesystem_name="s3", driver="GPKG"
     )
 
 

@@ -1,0 +1,14 @@
+name: dea
+channels:
+  - conda-forge
+dependencies:
+  - geopandas
+  - s3fs
+  - streamlit
+  - bokeh ==2.2.3
+  - pip
+
+  - pip:
+    - rcbm
+    - icontract
+    - .
