@@ -200,20 +200,21 @@ python-versions = "*"
 
 [[package]]
 name = "bokeh"
-version = "2.4.0"
+version = "2.2.3"
 description = "Interactive plots and applications in the browser from Python"
 category = "main"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.6"
 
 [package.dependencies]
-Jinja2 = ">=2.9"
+Jinja2 = ">=2.7"
 numpy = ">=1.11.3"
 packaging = ">=16.8"
 pillow = ">=7.1.0"
+python-dateutil = ">=2.1"
 PyYAML = ">=3.10"
 tornado = ">=5.1"
-typing-extensions = ">=3.10.0"
+typing_extensions = ">=3.7.4"
 
 [[package]]
 name = "botocore"
@@ -1403,7 +1404,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7.1,<4.0"
-content-hash = "cf926d846d570439bc8c8f23349e038abae69275a5ac405ffc9c6f32e71c08d9"
+content-hash = "fb06428947e3b278aac403238bfa0777826d743d9e976cefd04db1d07918b8c1"
 
 [metadata.files]
 aiobotocore = [
@@ -1527,8 +1528,7 @@ blinker = [
     {file = "blinker-1.4.tar.gz", hash = "sha256:471aee25f3992bd325afa3772f1063dbdbbca947a041b8b89466dc00d606f8b6"},
 ]
 bokeh = [
-    {file = "bokeh-2.4.0-py3-none-any.whl", hash = "sha256:91a7c3b8a42d9275df26f13269859a1add82dc9e5dda316f7476ad76a5a10851"},
-    {file = "bokeh-2.4.0.tar.gz", hash = "sha256:6fa00ed8baab5cca33f4175792c309fa2536eaae7e90abee884501ba8c90fddb"},
+    {file = "bokeh-2.2.3.tar.gz", hash = "sha256:c4a3f97afe5f525019dd58ee8c4e3d43f53fe1b1ac264ccaae9b02c07b2abc17"},
 ]
 botocore = [
     {file = "botocore-1.20.106-py2.py3-none-any.whl", hash = "sha256:47ec01b20c4bc6aaa16d21f756ead2f437b47c1335b083356cdc874e9140b023"},
