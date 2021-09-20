@@ -69,7 +69,7 @@ def main(
 def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
     selections = defaults.copy()
     for component, properties in defaults.items():
-        with st.beta_expander(label=f"Change {component} defaults"):
+        with st.expander(label=f"Change {component} defaults"):
             selections[component]["uvalue"]["target"] = st.number_input(
                 label="Threshold U-Value [W/m²K] - assume no retrofits below this value",
                 min_value=float(0),

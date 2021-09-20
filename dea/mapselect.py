@@ -115,6 +115,6 @@ def mapselect(
     points_selected = _get_points_on_selection(
         column_name=column_name, bokeh_plot=pointmap, points=points
     )
-    with st.beta_expander(f"Show selected {column_name}"):
+    with st.expander(f"Show selected {column_name}"):
         st.write(str(points_selected))
     return points_selected
