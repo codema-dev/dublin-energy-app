@@ -1,8 +1,0 @@
-bokeh
-icontract
-streamlit
-streamlit-bokeh-events
-pandas
-geopandas
-fsspec[s3]
-rcbm
