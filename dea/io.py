@@ -23,7 +23,7 @@ def _load(read: Callable, url: str, data_dir: Path, filesystem_name: str, **kwar
     return df
 
 
-@st.cache
+@st.cache_data
 def load_small_area_boundaries(url: str, data_dir: Path) -> gpd.GeoDataFrame:
     return _load(
         read=gpd.read_file, url=url, data_dir=data_dir, filesystem_name="s3", driver="GPKG"
@@ -44,7 +44,7 @@ def _add_retrofit_columns(buildings: pd.DataFrame) -> pd.DataFrame:
     return retrofit.calculate_fabric_heat_loss(buildings)
 
 
-@st.cache
+@st.cache_data
 def load_selected_buildings(
     url: str,
     data_dir: Path,

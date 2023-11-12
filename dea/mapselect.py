@@ -15,7 +15,7 @@ import streamlit as st
 from streamlit_bokeh_events import streamlit_bokeh_events
 
 
-@st.cache
+
 def _convert_gdf_geometry_to_xy(gdf: gpd.GeoDataFrame, epsg: str) -> gpd.GeoDataFrame:
     return (
         gdf.to_crs(epsg=epsg)
@@ -26,7 +26,7 @@ def _convert_gdf_geometry_to_xy(gdf: gpd.GeoDataFrame, epsg: str) -> gpd.GeoData
     )
 
 
-@st.cache
+
 def _convert_gdf_to_geojson_str(
     gdf: gpd.GeoDataFrame, epsg: str, tolerance_m: int = 50
 ) -> str:

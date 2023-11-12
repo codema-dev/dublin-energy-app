@@ -15,13 +15,11 @@ from dea.mapselect import mapselect
 from dea import retrofit
 
 DeaSelection = Dict[str, Any]
-DeaSelection = Dict[str, Any]
 
-# Function to be cached using st.cache_data
-@st.cache
-def load_small_area_boundaries(config, data_dir):
+@st.cache_data
+def load_small_area_boundaries(small_area_boundaries_url, data_dir):
     return io.load_small_area_boundaries(
-        url=config["urls"]["small_area_boundaries"], data_dir=data_dir
+        url=small_area_boundaries_url, data_dir=data_dir
     )
 
 def main(
@@ -31,7 +29,9 @@ def main(
 ):
     st.header("Welcome to the Dublin Retrofitting Tool")
 
-    small_area_boundaries = load_small_area_boundaries(config, data_dir)
+    small_area_boundaries_url = config["urls"]["small_area_boundaries"]
+    small_area_boundaries = load_small_area_boundaries(small_area_boundaries_url, data_dir)
+
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
