@@ -15,7 +15,14 @@ from dea.mapselect import mapselect
 from dea import retrofit
 
 DeaSelection = Dict[str, Any]
+DeaSelection = Dict[str, Any]
 
+# Function to be cached using st.cache_data
+@st.cache
+def load_small_area_boundaries(config, data_dir):
+    return io.load_small_area_boundaries(
+        url=config["urls"]["small_area_boundaries"], data_dir=data_dir
+    )
 
 def main(
     defaults: DeaSelection = DEFAULTS,
@@ -24,9 +31,7 @@ def main(
 ):
     st.header("Welcome to the Dublin Retrofitting Tool")
 
-    small_area_boundaries = io.load_small_area_boundaries(
-        url=config["urls"]["small_area_boundaries"], data_dir=data_dir
-    )
+    small_area_boundaries = load_small_area_boundaries(config, data_dir)
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
@@ -77,7 +82,7 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
                 key=component + "_threshold",
                 step=0.05,
             )
-            c1, c2 = st.beta_columns(2)
+            c1, c2 = st.columns(2)
             selections[component]["cost"]["lower"] = c1.number_input(
                 label="Lowest* Likely Cost [€/m²]",
                 min_value=0,
