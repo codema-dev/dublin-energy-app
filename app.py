@@ -48,8 +48,7 @@ def main(
 
     if inputs_are_submitted:
         pre_retrofit = io.load_selected_buildings(
-            #url=config["urls"]["bers"],
-            url="s3://codema-dev/views/2021_08_12_ireland_census_individual_buildings_inferred_period_built.parquet",
+            url=config["urls"]["bers"],
             data_dir=data_dir,
             selected_energy_ratings=selected_energy_ratings,
             selected_small_areas=selected_small_areas,

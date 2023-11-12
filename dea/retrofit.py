@@ -59,7 +59,7 @@ def retrofit_buildings(
 
 
 def calculate_fabric_heat_loss(buildings: pd.DataFrame) -> pd.Series:
-    buildings["fabric_heat_loss_w_per_k"] = fab.calculate_fabric_heat_loss_coefficient(
+    buildings["fabric_heat_loss_w_per_k"] = fab.calculate_fabric_heat_loss_coefficient( #in the fab file doenst exist calculate_fabric_heat_loss so replace by calculate_fabric_heat_loss_coefficient 
         roof_area=buildings["roof_area"],
         roof_uvalue=buildings["roof_uvalue"],
         wall_area=buildings["wall_area"],
