@@ -1,4 +1,3 @@
-[tool.poetry]
 name = "dea"
 version = "0.1.0"
 description = "Interactive Dublin Residential Retrofit Map"
