@@ -1,4 +1,3 @@
-python
 bokeh == 2.2
 icontract ==2.5.4
 streamlit ==1.28.1
