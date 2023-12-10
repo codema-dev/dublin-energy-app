@@ -17,13 +17,17 @@ import os
 
 
 import os
+import streamlit as st
 import boto3
 
-aws_access_key_id = os.environ.get("AKIA4DU27BZT6ZCC4IXN")
-aws_secret_access_key = os.environ.get("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")
+# Retrieve AWS credentials from environment variables
+aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
 # Use Boto3 with the obtained credentials
 s3_client = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+
+
 
 DeaSelection = Dict[str, Any]
 
