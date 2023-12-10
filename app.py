@@ -26,6 +26,10 @@ aws_access_key_id = config["aws"]["access_key_id"]
 aws_secret_access_key = config["aws"]["secret_access_key"]
 
 
+# Debugging print statements
+print(f"AWS Access Key ID: {aws_access_key_id}")
+print(f"AWS Secret Access Key: {aws_secret_access_key}")
+
 
 
 DeaSelection = Dict[str, Any]
