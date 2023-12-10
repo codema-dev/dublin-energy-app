@@ -16,16 +16,15 @@ from dea import retrofit
 import os
 
 
-import os
-import streamlit as st
-import boto3
+import toml
 
-# Retrieve AWS credentials from environment variables
-aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
-aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+# Read values from the TOML file
+config = toml.load("config.toml")
 
-# Use Boto3 with the obtained credentials
-s3_client = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+# Access AWS credentials
+aws_access_key_id = config["aws"]["access_key_id"]
+aws_secret_access_key = config["aws"]["secret_access_key"]
+
 
 
 
