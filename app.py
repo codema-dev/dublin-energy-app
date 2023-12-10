@@ -15,8 +15,15 @@ from dea.mapselect import mapselect
 from dea import retrofit
 import os
 
+
+import os
+import boto3
+
 aws_access_key_id = os.environ.get("AKIA4DU27BZT6ZCC4IXN")
 aws_secret_access_key = os.environ.get("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")
+
+# Use Boto3 with the obtained credentials
+s3_client = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
 
 DeaSelection = Dict[str, Any]
 
