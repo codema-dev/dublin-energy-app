@@ -9,3 +9,4 @@ rcbm == 0.1.0
 click == 8.0
 pandas
 Markup
+jinja2
