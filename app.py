@@ -13,6 +13,10 @@ from dea import io
 from dea import plot
 from dea.mapselect import mapselect 
 from dea import retrofit
+import os
+
+aws_access_key_id = os.environ.get("AKIA4DU27BZT6ZCC4IXN")
+aws_secret_access_key = os.environ.get("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")
 
 DeaSelection = Dict[str, Any]
 
