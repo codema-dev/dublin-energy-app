@@ -1,5 +1,3 @@
-github
-PyGithub
 aiohttp==3.8.6
 aioitertools==0.11.0
 aiosignal==1.3.1
