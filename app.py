@@ -20,27 +20,24 @@ import toml
 
 # Read values from the TOML file
 #config = toml.load("config.toml")
-from github import Github
-import toml
 
-repo_url = "https://github.com/Idelson-Mindo/k"
-file_path = "config.toml"
 
-g = Github()
-repo = g.get_repo(repo_url.split("/")[-1])
+import boto3
+import streamlit as st
 
-content = repo.get_contents(file_path)
-config = toml.loads(content.decoded_content)
+# Load AWS credentials from environment variables
+aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
 
 # Access AWS credentials
-aws_access_key_id = config["aws"]["access_key_id"]
-aws_secret_access_key = config["aws"]["secret_access_key"]
+#aws_access_key_id = config["aws"]["access_key_id"]
+#aws_secret_access_key = config["aws"]["secret_access_key"]
 
 
 # Debugging print statements
-print(f"AWS Access Key ID: {aws_access_key_id}")
-print(f"AWS Secret Access Key: {aws_secret_access_key}")
+#print(f"AWS Access Key ID: {aws_access_key_id}")
+#print(f"AWS Secret Access Key: {aws_secret_access_key}")
 
 
 
