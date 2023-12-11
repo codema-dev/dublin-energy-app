@@ -2,7 +2,7 @@
 name = "dea"
 version = "0.1.0"
 description = "Interactive Dublin Residential Retrofit Map"
-authors = ["Rowan Molony <rowan.molony@codema.ie>"]
+authors = ["Rowan Molony <rowan.molony@codema.ie>", "Idelson Mindo <idelson.mindo@codema.ie>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
