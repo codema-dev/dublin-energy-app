@@ -19,7 +19,8 @@ import os
 import toml
 
 # Read values from the TOML file
-config = toml.load("config.toml")
+#config = toml.load("config.toml")
+config = toml.load("https://github.com/Idelson-Mindo/k/blob/main/config.toml")
 
 # Access AWS credentials
 aws_access_key_id = config["aws"]["access_key_id"]
