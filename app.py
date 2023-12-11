@@ -20,7 +20,18 @@ import toml
 
 # Read values from the TOML file
 #config = toml.load("config.toml")
-config = toml.load("https://github.com/Idelson-Mindo/k/blob/main/config.toml")
+from github import Github
+import toml
+
+repo_url = "https://github.com/Idelson-Mindo/k"
+file_path = "config.toml"
+
+g = Github()
+repo = g.get_repo(repo_url.split("/")[-1])
+
+content = repo.get_contents(file_path)
+config = toml.loads(content.decoded_content)
+
 
 # Access AWS credentials
 aws_access_key_id = config["aws"]["access_key_id"]
