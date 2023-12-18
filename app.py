@@ -11,11 +11,43 @@ from dea import _DATA_DIR
 from dea import filter
 from dea import io
 from dea import plot
-from dea.mapselect import mapselect
+from dea.mapselect import mapselect 
 from dea import retrofit
+import os
+
+
+import toml
+
+# Read values from the TOML file
+#config = toml.load("config.toml")
+
+
+import boto3
+import streamlit as st
+
+# Load AWS credentials from environment variables
+aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
+
+# Access AWS credentials
+#aws_access_key_id = config["aws"]["access_key_id"]
+#aws_secret_access_key = config["aws"]["secret_access_key"]
+
+
+# Debugging print statements
+#print(f"AWS Access Key ID: {aws_access_key_id}")
+#print(f"AWS Secret Access Key: {aws_secret_access_key}")
+
+
 
 DeaSelection = Dict[str, Any]
 
+@st.cache_data
+def load_small_area_boundaries(small_area_boundaries_url, data_dir):
+    return io.load_small_area_boundaries(
+        url=small_area_boundaries_url, data_dir=data_dir
+    )
 
 def main(
     defaults: DeaSelection = DEFAULTS,
@@ -24,9 +56,9 @@ def main(
 ):
     st.header("Welcome to the Dublin Retrofitting Tool")
 
-    small_area_boundaries = io.load_small_area_boundaries(
-        url=config["urls"]["small_area_boundaries"], data_dir=data_dir
-    )
+    small_area_boundaries_url = config["urls"]["small_area_boundaries"]
+    small_area_boundaries = load_small_area_boundaries(small_area_boundaries_url, data_dir)
+
 
     with st.form(key="Inputs"):
         st.markdown("ℹ️ Click `Submit` once you've selected all parameters")
@@ -77,7 +109,7 @@ def _retrofitselect(defaults: DeaSelection) -> DeaSelection:
                 key=component + "_threshold",
                 step=0.05,
             )
-            c1, c2 = st.beta_columns(2)
+            c1, c2 = st.columns(2)
             selections[component]["cost"]["lower"] = c1.number_input(
                 label="Lowest* Likely Cost [€/m²]",
                 min_value=0,

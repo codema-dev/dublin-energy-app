@@ -1,0 +1,32 @@
+name: AWS Deployment Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up AWS credentials
+      run: |
+        echo "[default]" > aws_credentials
+        echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> aws_credentials
+        echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> aws_credentials
+        aws configure --profile custom-profile < aws_credentials
+        rm aws_credentials
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Deploy to AWS
+      run: |
+        # Your deployment commands here using AWS CLI or SDK
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

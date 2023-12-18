@@ -3,7 +3,7 @@ from typing import List
 
 from bokeh.models.plots import Plot
 from bokeh.plotting import figure
-from bokeh.plotting import Figure
+#from bokeh.plotting import Figure
 from bokeh.models import ColumnDataSource
 from bokeh.models import CustomJS
 from bokeh.models import GeoJSONDataSource
@@ -15,7 +15,7 @@ import streamlit as st
 from streamlit_bokeh_events import streamlit_bokeh_events
 
 
-@st.cache
+
 def _convert_gdf_geometry_to_xy(gdf: gpd.GeoDataFrame, epsg: str) -> gpd.GeoDataFrame:
     return (
         gdf.to_crs(epsg=epsg)
@@ -26,7 +26,7 @@ def _convert_gdf_geometry_to_xy(gdf: gpd.GeoDataFrame, epsg: str) -> gpd.GeoData
     )
 
 
-@st.cache
+
 def _convert_gdf_to_geojson_str(
     gdf: gpd.GeoDataFrame, epsg: str, tolerance_m: int = 50
 ) -> str:
@@ -55,7 +55,7 @@ def _plot_basemap(boundaries: gpd.GeoDataFrame, epsg: str):
     return plot
 
 
-def _plot_points(plot: Plot, points: pd.DataFrame) -> Figure:
+def _plot_points(plot: Plot, points: pd.DataFrame) -> figure:
     cds_lasso = ColumnDataSource(points)
     cds_lasso.selected.js_on_change(
         "indices",
